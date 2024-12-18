@@ -21,7 +21,7 @@ async def ensure_valid_moderator_token(context: ContextTypes.DEFAULT_TYPE) -> st
     user_data = context.user_data
 
 
-    refresh_token = user_data.get("moderator_refresh_token")
+    refresh_token = user_data.get("refresh_token")
     if not refresh_token:
 
         await reset_moderator_to_start_menu(context)
@@ -30,9 +30,9 @@ async def ensure_valid_moderator_token(context: ContextTypes.DEFAULT_TYPE) -> st
     try:
 
         tokens = await refresh_moderator_token(refresh_token)
-        user_data["moderator_access_token"] = tokens["access_token"]
-        user_data["moderator_refresh_token"] = tokens.get("refresh_token", refresh_token)  # Оновлюємо, якщо є новий refresh_token
-        return user_data["moderator_access_token"]
+        user_data["access_token"] = tokens["access_token"]
+        user_data["refresh_token"] = tokens.get("refresh_token", refresh_token)  # Оновлюємо, якщо є новий refresh_token
+        return user_data["access_token"]
     except Exception as e:
 
         await reset_moderator_to_start_menu(context)
@@ -71,6 +71,8 @@ async def moderator_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 async def start_category_creation(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Запуск створення категорії."""
+    context.user_data["chat_id"] = update.effective_chat.id
+
     keyboard = [[KeyboardButton("Скасувати додавання")]]
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=False)
     await update.message.reply_text("Введіть назву категорії:", reply_markup=reply_markup)
@@ -115,12 +117,12 @@ async def get_parent_id(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     """Обробка вибору батьківської категорії."""
     query = update.callback_query
     await query.answer()
-    parent_id = None if query.data == "skip" else int(query.data)
 
+    parent_id = None if query.data == "skip" else int(query.data)
     context.user_data["parent_id"] = parent_id
 
     category_name = context.user_data["category_name"]
-    parent_category_text = "Пропущено" if parent_id is None else f"ID: {parent_id}"
+    parent_category_text = "Не обрано" if parent_id is None else f"ID: {parent_id}"
 
     keyboard = [
         [
@@ -146,19 +148,32 @@ async def cancel_creation(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         query = update.callback_query
         await query.answer()
         await query.edit_message_text("Процес створення категорії скасовано.")
-        chat_id = query.message.chat_id
-        await context.bot.send_message(chat_id=chat_id, text="Головне меню для модератора:", reply_markup=ReplyKeyboardMarkup([
-            [KeyboardButton("Додати категорію")],
-            [KeyboardButton("Видалити категорію")],
-            [KeyboardButton("Видалити заявку")],
-            [KeyboardButton("Перевірити користувача")],
-            [KeyboardButton("Вихід")]
-        ], resize_keyboard=True, one_time_keyboard=False))
+        try:
+            chat_id = query.message.chat_id if query.message else update.effective_chat.id
+            await context.bot.send_message(
+                chat_id=chat_id,
+                text="Головне меню для модератора:",
+                reply_markup=ReplyKeyboardMarkup(
+                    [
+                        [KeyboardButton("Додати категорію")],
+                        [KeyboardButton("Видалити категорію")],
+                        [KeyboardButton("Видалити заявку")],
+                        [KeyboardButton("Перевірити користувача")],
+                        [KeyboardButton("Вихід")]
+                    ],
+                    resize_keyboard=True,
+                    one_time_keyboard=False
+                )
+            )
+        except Exception as e:
+            print(f"Помилка під час відправки повідомлення: {str(e)}")
     else:
         await update.message.reply_text("Процес створення категорії скасовано.")
         await moderator_main_menu(update, context)
 
     return ConversationHandler.END
+
+
 
 async def confirm_creation(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Підтвердження створення категорії."""
@@ -175,7 +190,6 @@ async def confirm_creation(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     parent_id = context.user_data.get("parent_id")
 
     try:
-
         result = await create_or_activate_category(category_name, parent_id, access_token)
         await query.edit_message_text(
             f"Категорія успішно створена або активована!\n"
@@ -185,17 +199,32 @@ async def confirm_creation(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         )
     except ValueError as e:
         await query.edit_message_text(f"Помилка: {str(e)}")
+        return ConversationHandler.END
     except Exception as e:
         await query.edit_message_text(f"Невідома помилка: {str(e)}")
+        return ConversationHandler.END
 
-    chat_id = query.message.chat_id
-    await context.bot.send_message(chat_id=chat_id, text="Головне меню для модератора:", reply_markup=ReplyKeyboardMarkup([
-        [KeyboardButton("Додати категорію")],
-        [KeyboardButton("Видалити категорію")],
-        [KeyboardButton("Видалити заявку")],
-        [KeyboardButton("Перевірити користувача")],
-        [KeyboardButton("Вихід")]
-    ], resize_keyboard=True, one_time_keyboard=False))
+    chat_id = query.message.chat_id if query.message else context.user_data.get("chat_id", None)
+
+    if not chat_id:
+        await query.edit_message_text("Помилка: Неможливо отримати chat_id. Спробуйте почати заново.")
+        return ConversationHandler.END
+
+    await context.bot.send_message(
+        chat_id=chat_id,
+        text="Головне меню для модератора:",
+        reply_markup=ReplyKeyboardMarkup(
+            [
+                [KeyboardButton("Додати категорію")],
+                [KeyboardButton("Видалити категорію")],
+                [KeyboardButton("Видалити заявку")],
+                [KeyboardButton("Перевірити користувача")],
+                [KeyboardButton("Вихід")]
+            ],
+            resize_keyboard=True,
+            one_time_keyboard=False
+        )
+    )
 
     return ConversationHandler.END
 

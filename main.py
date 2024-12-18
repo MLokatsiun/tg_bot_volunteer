@@ -1,4 +1,5 @@
-from telegram.ext import Application, CallbackQueryHandler
+from telegram import KeyboardButton, ReplyKeyboardMarkup, Update
+from telegram.ext import Application, CallbackQueryHandler, CallbackContext
 from telegram.ext import CommandHandler, MessageHandler, filters
 
 from handlers.volunteer.accept_application import accept_application_handler
@@ -13,7 +14,8 @@ from handlers.moderator.delete_categories import category_deactivation_handler
 from handlers.beneficiary.delete_profile_beneficiary import start_deactivation, confirm_deactivation, deactivation_handler_ben
 from handlers.beneficiary.get_applic_ben import choose_application_type_for_beneficiary, application_type_button_handler
 from handlers.moderator.moderator_login import moderator_auth_handler
-from handlers.authorization.registration import registration_handler
+from handlers.authorization.registration import registration_handler, start_beneficiary_registration, \
+    start_volunteer_registration
 from handlers.authorization.auth import auth_handler, handle_exit
 from handlers.volunteer.delete_profile_volunteer import \
     deactivation_handler_vol
@@ -21,23 +23,13 @@ from handlers.volunteer.edit_profile import edit_profile_handler
 from handlers.volunteer.get_applic_volunteer import choose_application_type, button
 from handlers.moderator.verify_user import verify_user_handler
 from decouple import config
-# Токен бота
+
 TELEGRAM_TOKEN = config("TELEGRAM_TOKEN")
 
-async def start(update, context) -> None:
-    """Головне меню."""
-    from telegram import ReplyKeyboardMarkup, KeyboardButton
-    keyboard = [
-        [KeyboardButton("Стати волонтером"), KeyboardButton("Стати бенефіціаром")],
-        [KeyboardButton("Авторизація модератора")]
-    ]
-    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-    await update.message.reply_text("Вітаємо! Оберіть дію:", reply_markup=reply_markup)
 
 def main():
     application = Application.builder().token(TELEGRAM_TOKEN).build()
 
-    application.add_handler(CommandHandler("start", start))
     application.add_handler(registration_handler)
     application.add_handler(auth_handler)
 
@@ -67,10 +59,6 @@ def main():
     application.add_handler(edit_profile_handler)
     application.add_handler(MessageHandler(filters.Regex("^Список завдань$"), choose_application_type))
     application.add_handler(CallbackQueryHandler(button, pattern="(available|in_progress|finished)"))
-
-
-  # Обробник для підтвердження деактивації
-
 
     application.run_polling()
 

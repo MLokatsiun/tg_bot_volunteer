@@ -1,10 +1,12 @@
 import logging
+from datetime import datetime
+
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import ContextTypes
 
 from services.api_client import get_applications_by_type, refresh_token_log
 
-PAGE_SIZE = 5
+ITEMS_PER_PAGE = 5
 
 
 async def ensure_valid_token(context):
@@ -70,14 +72,9 @@ async def choose_application_type_for_beneficiary(update, context):
         reply_markup=reply_markup
     )
 
-
 async def application_type_button_handler(update, context):
     query = update.callback_query
     application_type = query.data
-
-    if application_type == 'view_all':
-        await view_all_applications(query, context)
-        return
 
     try:
         access_token = await ensure_valid_token(context)
@@ -85,73 +82,104 @@ async def application_type_button_handler(update, context):
         await query.answer(text="Ви не авторизовані або виникла помилка з токеном. Спробуйте знову.")
         return
 
-    logging.info(f"Fetching applications of type: {application_type} with access token.")
-
     try:
         applications = await get_applications_by_type(access_token, application_type, "beneficiary")
 
-        logging.info(f"API response: {applications}")
-
         if isinstance(applications, dict) and 'detail' in applications:
-            logging.error(f"Error fetching applications: {applications['detail']}")
             await query.edit_message_text(f"Помилка при отриманні заявок: {applications['detail']}")
         elif not applications:
             await query.edit_message_text(f"Немає заявок із типом '{application_type}'.")
         else:
-
             applications = sorted(applications, key=lambda x: x['id'])
 
             context.user_data["applications_list"] = applications
             context.user_data["current_page"] = 0
 
-            reply_markup = await get_paginated_keyboard(applications, 0)
-            await query.edit_message_text(
-                f"Заявки з типом '{application_type}':\n\n",
-                reply_markup=reply_markup
+            response_text, reply_markup = await generate_paginated_response(
+                applications, application_type, 0
             )
+            await query.edit_message_text(response_text, reply_markup=reply_markup)
+
     except Exception as e:
-        logging.error(f"Error fetching applications: {str(e)}")
         await query.edit_message_text(f"Помилка при отриманні заявок: {str(e)}")
 
 
-async def get_paginated_keyboard(applications, page):
-    """Створення клавіатури з пагінацією."""
-    start = page * PAGE_SIZE
-    end = start + PAGE_SIZE
-    current_apps = applications[start:end]
+async def generate_paginated_response(applications, application_type, page):
+    """Формує текст і клавіатуру для пагінації заявок."""
+    start = page * ITEMS_PER_PAGE
+    end = start + ITEMS_PER_PAGE
+    paginated_apps = applications[start:end]
 
-    keyboard = [
-        [InlineKeyboardButton(f"ID: {app['id']} | {app['description']}", callback_data=f"app_{app['id']}")]
-        for app in current_apps
-    ]
+    response_text = f"Заявки з типом '{application_type}':\n\n"
 
-    navigation_buttons = []
+    def format_date(date_str):
+        if date_str:
+            try:
+                date_obj = datetime.fromisoformat(date_str)
+                return date_obj.strftime("%d.%m.%Y %H:%M")
+            except ValueError:
+                return "Невірний формат дати"
+        return "Не вказано"
+
+    for app in paginated_apps:
+        if app is None:
+            continue
+
+        description = app.get("description", "Немає опису")
+        active_to = app.get("active_to", "Немає дати")
+
+        if application_type != "accessible":
+            creator = app.get("executor", {})
+            first_name = creator.get("first_name", "Невідомо")
+            phone_num = creator.get("phone_num", "Невідомо")
+            creator_info = f"Автор: {first_name}, Телефон: {phone_num}"
+        else:
+            creator_info = ""
+
+        active_to_formatted = format_date(active_to)
+
+        response_text += (
+            f"Заявка {app['id']}:\n"
+            f"Опис: {description}\n"
+            f"Активна до: {active_to_formatted}\n"
+            f"{creator_info}\n\n"
+        )
+
+    keyboard = []
+    total_pages = (len(applications) + ITEMS_PER_PAGE - 1) // ITEMS_PER_PAGE
+
+    nav_buttons = []
     if page > 0:
-        navigation_buttons.append(InlineKeyboardButton("⬅️ Назад", callback_data="prev_page"))
-    if end < len(applications):
-        navigation_buttons.append(InlineKeyboardButton("➡️ Вперед", callback_data="next_page"))
+        nav_buttons.append(InlineKeyboardButton("⬅️ Назад", callback_data=f"{application_type}|{page - 1}"))
+    if page < total_pages - 1:
+        nav_buttons.append(InlineKeyboardButton("Вперед ➡️", callback_data=f"{application_type}|{page + 1}"))
 
-    if navigation_buttons:
-        keyboard.append(navigation_buttons)
+    if nav_buttons:
+        keyboard.append(nav_buttons)
 
-    return InlineKeyboardMarkup(keyboard)
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    return response_text, reply_markup
 
 
 async def navigate_pages(update, context):
+    """Обробляє кнопки пагінації."""
     query = update.callback_query
-    current_page = context.user_data.get("current_page", 0)
+    data = query.data.split('|')
+    application_type = data[0]
+    page = int(data[1])
+
     applications = context.user_data.get("applications_list", [])
 
-    if query.data == "prev_page":
-        context.user_data["current_page"] = max(0, current_page - 1)
-    elif query.data == "next_page":
-        context.user_data["current_page"] = min(len(applications) // PAGE_SIZE, current_page + 1)
+    if not applications:
+        await query.edit_message_text("Немає заявок для відображення.")
+        return
 
-    reply_markup = await get_paginated_keyboard(applications, context.user_data["current_page"])
-    await query.edit_message_text(
-        f"Заявки з типом '{applications[0]['type']}':\n\n",
-        reply_markup=reply_markup
+    response_text, reply_markup = await generate_paginated_response(
+        applications, application_type, page
     )
+    await query.edit_message_text(response_text, reply_markup=reply_markup)
+
 
 
 async def view_all_applications(query, context):
@@ -159,7 +187,6 @@ async def view_all_applications(query, context):
     Функція для перегляду всіх заявок.
     Відображає всі заявки без фільтрації за типом.
     """
-    # Отримуємо всі заявки
     try:
         access_token = await ensure_valid_token(context)
     except Exception as e:

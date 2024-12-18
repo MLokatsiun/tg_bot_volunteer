@@ -9,13 +9,32 @@ from urllib3 import request
 from handlers.beneficiary.create_application import reverse_geocode
 from services.api_client import register_user, login_user
 
-# Константи для станів
-AWAIT_CONFIRMATION, ENTER_PHONE, ENTER_FIRSTNAME, ENTER_LASTNAME, ENTER_PATRONYMIC, CHOOSE_DEVICE, ENTER_LOCATION, CONFIRM_DATA,  = range(8)
+AWAIT_CONFIRMATION, ENTER_PHONE, ENTER_FIRSTNAME, ENTER_LASTNAME, ENTER_PATRONYMIC, CHOOSE_DEVICE, ENTER_LOCATION, CONFIRM_DATA, = range(
+    8)
 
 from decouple import config
 
 CLIENT_NAME = config("CLIENT_NAME")
 CLIENT_PASSWORD = config("CLIENT_PASSWORD")
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    deep_link_data = context.args
+
+    if deep_link_data:
+        param = deep_link_data[0]
+        if param == "volunteer":
+            return await start_volunteer_registration(update, context)
+        elif param == "beneficiary":
+            return await start_beneficiary_registration(update, context)
+
+    keyboard = [
+        [KeyboardButton("Стати волонтером"), KeyboardButton("Стати бенефіціаром")],
+        [KeyboardButton("Авторизація модератора")]
+    ]
+    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+    await update.message.reply_text("Вітаємо! Оберіть дію:", reply_markup=reply_markup)
+
+    return ConversationHandler.END
 
 
 async def start_volunteer_registration(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -23,15 +42,16 @@ async def start_volunteer_registration(update: Update, context: ContextTypes.DEF
     context.user_data["role_id"] = 2
     return await check_and_start_registration(update, context)
 
+
 async def start_beneficiary_registration(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Перевірка, чи користувач уже зареєстрований, перед початком процесу реєстрації для бенефіціара."""
     context.user_data["role_id"] = 1
     return await check_and_start_registration(update, context)
 
+
 async def check_and_start_registration(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     tg_id = update.effective_user.id
     role_id = context.user_data.get("role_id")
-
 
     if update.message.text and "Скасувати" in update.message.text:
         return await cancel(update, context)
@@ -53,33 +73,36 @@ async def check_and_start_registration(update: Update, context: ContextTypes.DEF
             context.user_data["access_token"] = access_token
             context.user_data["refresh_token"] = refresh_token
 
-
             await update.message.reply_text(
                 "Ви вже зареєстровані! Переходимо до головного меню."
             )
             await main_menu(update, context)
             return ConversationHandler.END
 
-    except ValueError as ve:
-        await update.message.reply_text(f"Помилка: {ve}")
+
     except PermissionError:
 
-        keyboard = [[KeyboardButton("Перевірити статус волонтера")], [KeyboardButton("Скасувати")]] \
-            if role_id == 2 else [[KeyboardButton("Перевірити статус бенефіціара")], [KeyboardButton("Скасувати")]]
+        keyboard = [
+            [KeyboardButton("Перевірити статус волонтера")],
+            [KeyboardButton("Скасувати")]
+        ] if role_id == 2 else [
+            [KeyboardButton("Перевірити статус бенефіціара")],
+            [KeyboardButton("Скасувати")]
+        ]
         reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
+
         await update.message.reply_text(
+
             "Доступ заборонено. Зверніться до адміністратора або дочекайтеся підтвердження модератора.",
+
             reply_markup=reply_markup
         )
         return AWAIT_CONFIRMATION
-    except Exception as e:
-        print(f"Error checking registration: {str(e)}")
-        await update.message.reply_text(
-            "Сталася помилка під час перевірки реєстрації. Спробуйте пізніше або зверніться до підтримки."
-        )
 
+    except Exception:
 
-    return await start_registration(update, context)
+        return await start_registration(update, context)
+
 
 async def start_registration(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Початок процесу реєстрації."""
@@ -103,7 +126,7 @@ async def enter_phone(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
     if update.message.contact:
         phone = update.message.contact.phone_number
 
-
+        print("Contact data:", update.message.contact)
         if phone.startswith('+'):
             phone = phone[1:]
         elif phone.startswith('8'):
@@ -112,8 +135,8 @@ async def enter_phone(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
             await update.message.reply_text("Будь ласка, поділіться коректним номером телефону.")
             return ENTER_PHONE
 
+        print("Extracted phone number:", phone)
         context.user_data["phone_num"] = phone
-
 
         keyboard = [[KeyboardButton("Скасувати")]]
         reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
@@ -128,31 +151,30 @@ async def enter_phone(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
             reply_markup=reply_markup
         )
 
+        print("Proceeding to ENTER_FIRSTNAME")
         return ENTER_FIRSTNAME
     else:
+        print("No contact data provided.")
         await update.message.reply_text("Будь ласка, скористайтесь кнопкою для передачі номера телефону.")
         return ENTER_PHONE
 
 
-
-
 MAX_NAME_LENGTH = 50
 MIN_NAME_LENGTH = 2
+
 
 async def enter_name(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Обробка введення імені, прізвища і по-батькові одним рядком."""
     if update.message.text == "Скасувати":
         return await cancel(update, context)
 
-    name_parts = update.message.text.strip().split()
+    user_input = update.message.text.strip()
 
-
-    valid_name_regex = r"^[A-Za-zА-Яа-яЁё]+$"
-
-
-    if not all(re.match(valid_name_regex, part) for part in name_parts):
-        await update.message.reply_text("Будь ласка, введіть лише літери (латиниця, кирилиця, російська).")
+    if len(user_input) > MAX_NAME_LENGTH:
+        await update.message.reply_text(f"Текст занадто довгий. Максимальна довжина – {MAX_NAME_LENGTH} символів.")
         return ENTER_FIRSTNAME
+
+    name_parts = user_input.split()
 
     if len(name_parts) == 1:
         context.user_data["firstname"] = name_parts[0]
@@ -172,6 +194,7 @@ async def enter_name(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     else:
         return await confirm_registration(update, context)
 
+
 async def choose_device(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Запитує, чи працює користувач з телефону чи ПК."""
     keyboard = [
@@ -185,6 +208,7 @@ async def choose_device(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
         reply_markup=reply_markup
     )
     return ENTER_LOCATION
+
 
 async def enter_coordinates(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Обробка введення координат або отримання адреси через зворотне геокодування."""
@@ -215,7 +239,6 @@ async def enter_coordinates(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             )
             return ENTER_LOCATION
 
-
         coordinates_match = re.match(r"^(-?\d+(\.\d+)?),\s*(-?\d+(\.\d+)?)$", user_response)
         if coordinates_match:
             latitude = float(coordinates_match.group(1))
@@ -224,7 +247,6 @@ async def enter_coordinates(update: Update, context: ContextTypes.DEFAULT_TYPE) 
                 "latitude": latitude,
                 "longitude": longitude
             }
-
 
             address = await reverse_geocode(latitude, longitude)
             context.user_data["location"]["address"] = address
@@ -252,7 +274,6 @@ async def enter_coordinates(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             "latitude": latitude,
             "longitude": longitude
         }
-
 
         address = await reverse_geocode(latitude, longitude)
         context.user_data["location"]["address"] = address
@@ -287,7 +308,6 @@ async def confirm_registration(update: Update, context: ContextTypes.DEFAULT_TYP
     else:
         location_display = "Не вказано"
 
-
     confirmation_message = (
         f"Ваші дані для підтвердження:\n\n"
         f"Телефон: {phone}\n"
@@ -299,13 +319,11 @@ async def confirm_registration(update: Update, context: ContextTypes.DEFAULT_TYP
         "Якщо все вірно, натисніть 'Підтвердити'. Якщо потрібно виправити, натисніть 'Скасувати'."
     )
 
-
     keyboard = [
         [KeyboardButton("Підтвердити")],
         [KeyboardButton("Скасувати")]
     ]
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
-
 
     await update.message.reply_text(confirmation_message, reply_markup=reply_markup)
     return CONFIRM_DATA
@@ -321,7 +339,6 @@ async def send_to_api(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
         await register_user(user_id, user_data)
         role_id = user_data.get("role_id")
 
-
         if role_id == 2:
             keyboard = [
                 [KeyboardButton("Перевірити статус волонтера")],
@@ -332,7 +349,6 @@ async def send_to_api(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
                 [KeyboardButton("Перевірити статус бенефіціара")],
                 [KeyboardButton("Скасувати")]
             ]
-
 
         reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
 
@@ -366,11 +382,8 @@ async def send_to_api(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
         return CONFIRM_DATA
 
 
-
-
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Скасування реєстрації та повернення до головного меню."""
-
 
     if "Скасувати" in update.message.text:
 
@@ -378,7 +391,6 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
             "Реєстрацію скасовано. Повертаємось до головного меню.",
             reply_markup=ReplyKeyboardRemove()
         )
-
 
         keyboard = [[KeyboardButton("Стати волонтером"), KeyboardButton("Стати бенефіціаром")]]
         reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
@@ -424,8 +436,10 @@ async def main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=False)
     await update.message.reply_text("Оберіть дію з меню нижче:", reply_markup=reply_markup)
 
+
 registration_handler = ConversationHandler(
     entry_points=[
+        CommandHandler("start", start),
         MessageHandler(filters.Regex("^Стати волонтером$"), start_volunteer_registration),
         MessageHandler(filters.Regex("^Стати бенефіціаром$"), start_beneficiary_registration),
     ],

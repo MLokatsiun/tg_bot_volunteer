@@ -174,7 +174,7 @@ async def get_location(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
 
             await update.message.reply_text(
                 f"Координати отримано. Визначена адреса: {address}.\n"
-                "Введіть дату, до якої заявка буде активною (у форматі YYYY-MM-DD):"
+                "Введіть дату, до якої заявка буде активною (у форматі ДД.ММ.РРРР 00:00):"
             )
             return ENTER_ACTIVE_TO
 
@@ -204,7 +204,7 @@ async def get_location(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
 
 import aiohttp
 
-GOOGLE_GEOCODING_API_KEY = "AIzaSyAQNEr0bikVrVxkThTtVKnmm1pxUz4siOI"
+GOOGLE_GEOCODING_API_KEY = config("GOOGLE_GEOCODING_API_KEY")
 
 
 async def reverse_geocode(latitude: float, longitude: float) -> str:
