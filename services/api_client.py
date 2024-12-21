@@ -7,6 +7,7 @@ from decouple import config
 CLIENT_NAME = config('CLIENT_NAME')
 CLIENT_PASSWORD = config('CLIENT_PASSWORD')
 
+
 async def register_user(user_id, user_data):
     """Реєстрація користувача через API"""
     url = "https://bot.bckwdd.fun/auth/register/"
@@ -21,7 +22,7 @@ async def register_user(user_id, user_data):
         "password": CLIENT_PASSWORD,
     }
 
-    if user_data["role_id"] == 2:  # Для волонтерів додаємо локацію
+    if user_data["role_id"] == 2:
         location = user_data.get("location", {})
         if location:
             data["location"] = location
@@ -32,10 +33,10 @@ async def register_user(user_id, user_data):
                 raise Exception(f"Помилка API: {response.status}, {await response.text()}")
 
 
-
 import aiohttp
 
-API_URL = "https://bot.bckwdd.fun"  # Замініть на адресу вашого API
+API_URL = "https://bot.bckwdd.fun"
+
 
 async def login_user(login_request):
     """Відправка запиту на авторизацію користувача."""
@@ -43,7 +44,7 @@ async def login_user(login_request):
     async with aiohttp.ClientSession() as session:
         async with session.post(url, json=login_request) as response:
             if response.status == 200:
-                return await response.json()  # Успішна авторизація
+                return await response.json()
             elif response.status == 400:
                 data = await response.json()
                 raise ValueError(data.get("detail", "Invalid request"))
@@ -54,31 +55,19 @@ async def login_user(login_request):
                 raise Exception(f"Unexpected error: {response.status}")
 
 
-import http.client
-import json
 import logging
 
-import requests
-import json
-
-import aiohttp
-import json
-import logging
-
-# Встановлення базового рівня логування
 logging.basicConfig(level=logging.INFO)
 
 
 async def edit_volunteer_location_and_categories(access_token, location, categories):
     url = "https://bot.bckwdd.fun/volunteer/profile/"
 
-    # Створюємо payload для запиту
     payload = {
-        "location": location if location else None,  # Перевірка, чи є локація
-        "categories": categories if categories else []  # Якщо категорії порожні, передаємо порожній список
+        "location": location if location else None,
+        "categories": categories if categories else []
     }
 
-    # Заголовки для запиту
     headers = {
         'Authorization': f'Bearer {access_token}',
         'Content-Type': 'application/json'
@@ -88,21 +77,16 @@ async def edit_volunteer_location_and_categories(access_token, location, categor
     logging.info(f"Headers: {headers}")
     logging.info(f"Payload: {payload}")
 
-    # Відправляємо асинхронний запит PUT
     async with aiohttp.ClientSession() as session:
         try:
-            # Відправляємо PUT запит
             async with session.put(url, headers=headers, json=payload) as response:
-                # Отримуємо відповідь від сервера
                 response_text = await response.text()
 
-                # Логування статусу відповіді
                 logging.info(f"Response Status: {response.status}")
                 logging.info(f"Response Text: {response_text}")
 
                 if response.status == 200:
-                    # Якщо запит успішний, виводимо відповідь
-                    return await response.json()  # Повертаємо відповідь як JSON
+                    return await response.json()
                 else:
                     logging.error(f"Error: {response.status} - {response_text}")
                     return None
@@ -111,16 +95,11 @@ async def edit_volunteer_location_and_categories(access_token, location, categor
             return None
 
 
-import aiohttp
-import logging
-
-
-import logging
-
 import logging
 import aiohttp
 
 logger = logging.getLogger(__name__)
+
 
 async def deactivate_volunteer_account(access_token: str) -> bool:
     url = "https://bot.bckwdd.fun/volunteer/profile/"
@@ -155,11 +134,13 @@ async def deactivate_volunteer_account(access_token: str) -> bool:
             logging.error(f"Unexpected error: {str(e)}")
             raise
 
+
 import aiohttp
 import logging
 
 # Логування
 logging.basicConfig(level=logging.INFO)
+
 
 async def get_applications_by_status(access_token: str, status: str):
     url = f"{API_URL}/volunteer/applications/?type={status}"
@@ -212,25 +193,9 @@ async def accept_application(access_token, application_id):
             else:
                 response.raise_for_status()
 
-import aiohttp
 
-import aiohttp
-
-import aiohttp
 from aiohttp import FormData, ClientSession
 
-from aiohttp import FormData
-from pathlib import Path
-
-
-import aiohttp
-from aiohttp import FormData
-from pathlib import Path
-
-import aiohttp
-import logging
-
-import aiohttp
 
 async def close_application(access_token, application_id, files):
     """Закриття заявки із завантаженням файлів."""
@@ -255,8 +220,6 @@ async def close_application(access_token, application_id, files):
             return await response.json()
 
 
-import aiohttp
-
 async def login_moderator(login_request):
     """Відправка запиту на авторизацію модератора."""
     url = f"{API_URL}/moderator/login/"
@@ -272,9 +235,6 @@ async def login_moderator(login_request):
                 raise PermissionError(data.get("detail", "Forbidden"))
             else:
                 raise Exception(f"Unexpected error: {response.status}")
-
-
-import aiohttp
 
 
 async def create_or_activate_category(name: str, parent_id: int = None, access_token: str = "") -> dict:
@@ -311,8 +271,8 @@ async def create_or_activate_category(name: str, parent_id: int = None, access_t
     except Exception as e:
         raise RuntimeError(f"Помилка при створенні категорії: {str(e)}")
 
-async def deactivate_category(category_id: int, access_token: str) -> dict:
 
+async def deactivate_category(category_id: int, access_token: str) -> dict:
     url = f"{API_URL}/moderator/categories/"
     headers = {"Authorization": f"Bearer {access_token}"}
     payload = {"id": category_id}
@@ -331,6 +291,7 @@ async def deactivate_category(category_id: int, access_token: str) -> dict:
     except Exception as e:
         raise RuntimeError(f"Помилка при деактивації категорії: {str(e)}")
 
+
 async def deactivate_application(application_id: int, access_token: str):
     """Деактивація заявки за її ID."""
     url = f"{API_URL}/moderator/applications/"
@@ -339,7 +300,7 @@ async def deactivate_application(application_id: int, access_token: str):
         raise PermissionError("Не знайдено токен доступу. Будь ласка, авторизуйтесь.")
 
     headers = {
-        'Authorization': f'Bearer {access_token}'  # Авторизація через токен
+        'Authorization': f'Bearer {access_token}'
     }
 
     data = {
@@ -363,13 +324,11 @@ async def verify_user(user_id: int, is_verified: bool, access_token: str, refres
     """Оновлення статусу верифікації користувача з перевіркою токену."""
     url = f"{API_URL}/moderator/verify_user/"
 
-    # Підготовка даних для запиту
     data = {
         "user_id": user_id,
         "is_verified": is_verified
     }
 
-    # Викликаємо make_authenticated_request_with_refresh для виконання запиту з автоматичним оновленням токену
     try:
         response_data = await make_authenticated_request_with_refresh(
             url,
@@ -384,8 +343,6 @@ async def verify_user(user_id: int, is_verified: bool, access_token: str, refres
         print(f"Error in verify_user: {str(e)}")
         raise
 
-
-import aiohttp
 
 async def refresh_access_token(refresh_token: str, refresh_url: str) -> str:
     """
@@ -419,21 +376,18 @@ async def make_authenticated_request_with_refresh(
 ):
     """Виконує запит з автоматичним оновленням токену, якщо термін дії access token минув."""
 
-    # Заголовки для авторизації
     headers = {
         'Authorization': f'Bearer {access_token}',
         'Content-Type': 'application/json'
     }
 
-    # Виконуємо запит
     async with aiohttp.ClientSession() as session:
         async with session.request(method, url, headers=headers, **kwargs) as response:
-            # Якщо токен не дійсний (401), спробуємо оновити токен
             if response.status == 401:
                 try:
-                    # Оновлюємо токен
+
                     access_token = await refresh_access_token(refresh_token, refresh_url)
-                    # Повторно виконуємо запит з новим токеном
+
                     headers['Authorization'] = f'Bearer {access_token}'
                     async with session.request(method, url, headers=headers, **kwargs) as retry_response:
                         return await retry_response.json()
@@ -444,8 +398,6 @@ async def make_authenticated_request_with_refresh(
             else:
                 raise Exception(f"Unexpected error: {response.status}")
 
-import aiohttp
-import logging
 
 async def deactivate_beneficiary_profile(access_token: str) -> bool:
     url = "https://bot.bckwdd.fun/beneficiary/profile/"
@@ -459,10 +411,10 @@ async def deactivate_beneficiary_profile(access_token: str) -> bool:
         async with aiohttp.ClientSession() as session:
             async with session.delete(url, headers=headers) as response:
                 if response.status == 200:
-                    # Якщо профіль успішно деактивовано, повертаємо True
+
                     return True
                 else:
-                    # Якщо відповідь не є успішною, виводимо помилку
+
                     error_message = await response.json()
                     raise RuntimeError(error_message.get("detail", "An unknown error occurred"))
     except aiohttp.ClientError as e:
@@ -470,7 +422,6 @@ async def deactivate_beneficiary_profile(access_token: str) -> bool:
 
 
 import httpx
-from datetime import datetime
 from typing import Optional
 
 
@@ -488,13 +439,12 @@ async def create_application(description: str, category_id: Optional[int], addre
     :param access_token: Токен доступу для бенефіціара.
     :return: Інформація про створену заявку.
     """
-    url = "https://bot.bckwdd.fun/beneficiary/applications/"  # Заміни на реальний URL API
+    url = "https://bot.bckwdd.fun/beneficiary/applications/"
     headers = {
         "Authorization": f"Bearer {access_token}",
         "Content-Type": "application/json"
     }
 
-    # Підготовка даних для заявки
     data = {
         "description": description,
         "category_id": category_id,
@@ -507,9 +457,8 @@ async def create_application(description: str, category_id: Optional[int], addre
     async with httpx.AsyncClient() as client:
         try:
             response = await client.post(url, json=data, headers=headers)
-            response.raise_for_status()  # Піднімає виключення для HTTP 4xx/5xx
+            response.raise_for_status()
 
-            # Повертаємо результат
             return response.json()
         except httpx.HTTPStatusError as e:
             raise ValueError(f"HTTP error occurred: {e.response.status_code} - {e.response.text}")
@@ -518,11 +467,9 @@ async def create_application(description: str, category_id: Optional[int], addre
         except Exception as e:
             raise ValueError(f"Unexpected error: {str(e)}")
 
+
 async def confirm_application(application_id: int, access_token: str):
-    """
-    Виклик API для підтвердження заявки.
-    """
-    url = f"{API_URL}/beneficiary/applications/"  # Замініть на реальну URL
+    url = f"{API_URL}/beneficiary/applications/"
     headers = {"Authorization": f"Bearer {access_token}"}
     payload = {"application_id": application_id}
 
@@ -538,11 +485,9 @@ async def confirm_application(application_id: int, access_token: str):
             else:
                 raise ValueError("Невідома помилка API.")
 
+
 async def delete_application(application_id: int, access_token: str):
-    """
-    Виклик API для видалення заявки.
-    """
-    url = f"{API_URL}/beneficiary/applications/"  # Замініть на реальну URL
+    url = f"{API_URL}/beneficiary/applications/"
     headers = {"Authorization": f"Bearer {access_token}"}
     payload = {"application_id": application_id}
 
@@ -557,22 +502,12 @@ async def delete_application(application_id: int, access_token: str):
                 raise ValueError(error_detail.get("detail", "Помилка виконання API."))
 
 
-import aiohttp
 import logging
-
-import aiohttp
-import logging
-
-import aiohttp
-import logging
-
-  # Ваша база API URL
 
 
 async def get_applications_by_type(access_token: str, application_type: str, role: str):
     """Отримує список заявок за вказаним типом для бенефіціара (доступні, в процесі, завершені)."""
 
-    # Формуємо URL для запиту
     get_url = f"{API_URL}/{role}/applications/?type={application_type}"
 
     headers = {
@@ -594,6 +529,7 @@ async def get_applications_by_type(access_token: str, application_type: str, rol
     except Exception as e:
         logging.error(f"Request failed: {str(e)}")
         return {"detail": "Error: Unable to fetch applications."}
+
 
 async def cancel_application(access_token, application_id):
     """
@@ -623,7 +559,6 @@ async def cancel_application(access_token, application_id):
                 response.raise_for_status()
 
 
-# --- API Функції ---
 async def get_categories(client: str, password: str):
     """Отримання списку категорій із API."""
     url = "https://bot.bckwdd.fun/developers/categories/"
@@ -644,6 +579,7 @@ async def get_categories(client: str, password: str):
                 raise RuntimeError(f"Помилка сервера: {error.get('detail', 'Невідома помилка')}")
             else:
                 raise Exception(f"Неочікувана помилка: {response.status} {await response.text()}")
+
 
 async def get_customers(base_url: str) -> list:
     """
@@ -674,13 +610,12 @@ async def get_customers(base_url: str) -> list:
         else:
             raise ValueError(f"Unexpected error: {response.text}")
 
+
 import aiohttp
 
+
 async def refresh_token_log(refresh_token: str) -> dict:
-    """
-    Викликає API для оновлення токена доступу.
-    """
-    url = "https://bot.bckwdd.fun/auth/refresh/"  # Замініть на ваш реальний ендпоінт
+    url = "https://bot.bckwdd.fun/auth/refresh/"
     payload = {"refresh_token": refresh_token}
 
     async with aiohttp.ClientSession() as session:
@@ -693,10 +628,7 @@ async def refresh_token_log(refresh_token: str) -> dict:
 
 
 async def refresh_moderator_token(refresh_token: str) -> dict:
-    """
-    Викликає API для оновлення токена доступу.
-    """
-    url = "https://bot.bckwdd.fun/moderator/refresh-token/"  # Замініть на ваш реальний ендпоінт
+    url = "https://bot.bckwdd.fun/moderator/refresh-token/"
     payload = {"refresh_token": refresh_token}
 
     async with aiohttp.ClientSession() as session:

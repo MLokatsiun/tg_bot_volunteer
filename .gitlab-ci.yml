@@ -1,0 +1,41 @@
+stages:
+  - stop_docker
+  - build
+  - start_docker
+
+job_stop_docker:
+  stage: stop_docker
+  script:
+    - echo "Stopping Docker containers"
+    - cd $BOT_DOCKERFILE
+    - docker compose stop
+  only:
+    - main
+  tags:
+    - bot-tg
+
+job_build:
+  stage: build
+  script:
+    - echo "Building the project"
+    - rsync -av --delete --exclude='.git' --exclude='venv' --exclude='.env' ./ $BOT_SRC
+    - rsync -av --exclude='.git' --exclude='venv' --exclude='.env' ./ $BOT_SRC
+  only:
+    - main
+  tags:
+    - bot-tg
+  dependencies:
+    - job_stop_docker
+
+job_start_docker:
+  stage: start_docker
+  script:
+    - echo "Starting Docker containers"
+    - cd $BOT_DOCKERFILE
+    - docker compose up --build -d
+  only:
+    - main
+  tags:
+    - bot-tg
+  dependencies:
+    - job_build
