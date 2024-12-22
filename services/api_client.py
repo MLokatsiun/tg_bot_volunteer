@@ -561,7 +561,7 @@ async def cancel_application(access_token, application_id):
 
 async def get_categories(client: str, password: str):
     """Отримання списку категорій із API."""
-    url = "https://bot.bckwdd.fun/developers/categories/"
+    url = "https://bot.bckwdd.fun/moderator/app/categories/"
     payload = {
         "for_developers": {"client": client, "password": password},
         "client": client,
@@ -591,7 +591,7 @@ async def get_customers(base_url: str) -> list:
     :return: Список користувачів
     :raises ValueError: У разі помилки запиту
     """
-    url = f"{base_url}/developers/customers/"
+    url = f"{base_url}/moderator/app/customers/"
     payload = {
         "client": CLIENT_NAME,
         "password": CLIENT_PASSWORD

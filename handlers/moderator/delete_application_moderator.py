@@ -19,7 +19,7 @@ async def ensure_valid_moderator_token(context: ContextTypes.DEFAULT_TYPE) -> st
     """
     user_data = context.user_data
 
-    refresh_token = user_data.get("moderator_refresh_token")
+    refresh_token = user_data.get("refresh_token")
     if not refresh_token:
 
         await reset_moderator_to_start_menu(context)
@@ -27,9 +27,9 @@ async def ensure_valid_moderator_token(context: ContextTypes.DEFAULT_TYPE) -> st
 
     try:
         tokens = await refresh_moderator_token(refresh_token)
-        user_data["moderator_access_token"] = tokens["access_token"]
-        user_data["moderator_refresh_token"] = tokens.get("refresh_token", refresh_token)  # Оновлюємо, якщо є новий refresh_token
-        return user_data["moderator_access_token"]
+        user_data["access_token"] = tokens["access_token"]
+        user_data["refresh_token"] = tokens.get("refresh_token", refresh_token)
+        return user_data["access_token"]
     except Exception as e:
 
         await reset_moderator_to_start_menu(context)
@@ -41,10 +41,10 @@ async def reset_moderator_to_start_menu(context: ContextTypes.DEFAULT_TYPE):
     """
     if "moderator_user_id" in context.user_data:
         del context.user_data["moderator_user_id"]
-    if "moderator_access_token" in context.user_data:
-        del context.user_data["moderator_access_token"]
-    if "moderator_refresh_token" in context.user_data:
-        del context.user_data["moderator_refresh_token"]
+    if "access_token" in context.user_data:
+        del context.user_data["access_token"]
+    if "refresh_token" in context.user_data:
+        del context.user_data["refresh_token"]
 
     await context.bot.send_message(
         chat_id=context.user_data.get("chat_id"),
