@@ -112,7 +112,6 @@ async def choose_distance(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     query = update.callback_query
     await query.answer()
 
-    # Отримуємо вибрану дистанцію
     if not query.data.startswith("distance_"):
         await query.edit_message_text("Неправильний вибір. Будь ласка, спробуйте ще раз.")
         return ConversationHandler.END
@@ -123,7 +122,6 @@ async def choose_distance(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
     max_distance = int(selected_distance.split(" ")[1])
 
-    # Фільтруємо заявки за дистанцією
     all_applications = context.user_data.get("all_applications", [])
     filtered_applications = [
         app for app in all_applications
@@ -186,7 +184,6 @@ async def choose_application(update: Update, context: ContextTypes.DEFAULT_TYPE)
     query = update.callback_query
     await query.answer()
 
-    # Перевіряємо, чи це вибір заявки (починається з "app_")
     if not query.data.startswith("app_"):
         await query.edit_message_text("Неправильний вибір. Будь ласка, спробуйте ще раз.")
         return CHOOSE_APPLICATION
@@ -243,7 +240,8 @@ async def confirm_application(update: Update, context: ContextTypes.DEFAULT_TYPE
     try:
         application_data = await accept_application(access_token, int(application_id))
 
-        local_application_data = next((app for app in context.user_data["applications_list"] if str(app["id"]) == application_id), {})
+        local_application_data = next(
+            (app for app in context.user_data["applications_list"] if str(app["id"]) == application_id), {})
 
         creator_name = (
                 application_data.get("creator", {}).get("first_name")
@@ -259,11 +257,14 @@ async def confirm_application(update: Update, context: ContextTypes.DEFAULT_TYPE
         longitude = location.get("longitude", "Не вказано")
         address = location.get("address_name", "Адреса не вказана")
 
+        google_maps_url = f"[тут](https://www.google.com/maps?q={latitude},{longitude})" if latitude != "Не вказано" and longitude != "Не вказано" else "Не вказано"
 
-        google_maps_url = f"https://www.google.com/maps?q={latitude},{longitude}" if latitude != "Не вказано" and longitude != "Не вказано" else "Не вказано"
-
-
-        location_text = f"Координати: {latitude}, {longitude}\nАдреса: {address}\n\nПосилання на Google Maps: {google_maps_url}"
+        location_text = (
+            f"Локація: {google_maps_url}\n"
+            f"Адреса: {address}\n\n"
+            if google_maps_url != "Не вказано"
+            else "Локація: не вказана\nАдреса: не вказана"
+        )
 
         def format_date(date_str):
             if date_str:
@@ -290,9 +291,9 @@ async def confirm_application(update: Update, context: ContextTypes.DEFAULT_TYPE
             f"{location_text}"
         )
 
-        await query.edit_message_text(confirmation_text)
+        await query.edit_message_text(confirmation_text, parse_mode="Markdown", disable_web_page_preview=True)
     except Exception as e:
-        await query.edit_message_text(f"Сталася помилка: {str(e)}")
+        await query.edit_message_text(f"Сталася помилка: {str(e)}", parse_mode="Markdown")
 
     return ConversationHandler.END
 

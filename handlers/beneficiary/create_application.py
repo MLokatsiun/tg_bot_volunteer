@@ -9,6 +9,7 @@ from telegram.ext import (
 )
 from services.api_client import create_application, get_categories, refresh_token_log
 from decouple import config
+
 CLIENT_NAME = config("CLIENT_NAME")
 CLIENT_PASSWORD = config("CLIENT_PASSWORD")
 ENTER_CATEGORY_ID, ENTER_DESCRIPTION, ENTER_LOCATION, ENTER_ACTIVE_TO, CONFIRM_DATA = range(5)
@@ -32,23 +33,22 @@ async def start_application_creation(update: Update, context: ContextTypes.DEFAU
         categories = await get_categories(CLIENT_NAME, CLIENT_PASSWORD)
 
         if not categories:
-            await update.message.reply_text("Категорії відсутні. Спробуйте пізніше.")
-            await update.message.reply_text("Повертаюсь до головного меню.", reply_markup=MAIN_KEYBOARD)
+            await update.message.reply_text("❌ **Категорії відсутні. Спробуйте пізніше.**")
+            await update.message.reply_text("🔙 Повертаємось до головного меню.", reply_markup=MAIN_KEYBOARD)
             return ConversationHandler.END
 
         parent_categories = [cat for cat in categories if cat["parent_id"] is None]
 
         if not parent_categories:
-            await update.message.reply_text("Категорії верхнього рівня відсутні.")
-            await update.message.reply_text("Повертаюсь до головного меню.", reply_markup=MAIN_KEYBOARD)
+            await update.message.reply_text("❌ **Категорії верхнього рівня відсутні.**")
+            await update.message.reply_text("🔙 Повертаємось до головного меню.", reply_markup=MAIN_KEYBOARD)
             return ConversationHandler.END
 
-
         cancel_keyboard = ReplyKeyboardMarkup(
-            [[KeyboardButton("Скасувати подачу заявки")]], resize_keyboard=True, one_time_keyboard=True
+            [[KeyboardButton("❌ Скасувати подачу заявки")]], resize_keyboard=True, one_time_keyboard=True
         )
         await update.message.reply_text(
-            "Натисніть кнопку нижче для скасування реєстрації, якщо захочете змінити якісь дані:",
+            "❗ **Натисніть кнопку нижче для скасування реєстрації, якщо захочете змінити якісь дані:**",
             reply_markup=cancel_keyboard)
 
         keyboard = [
@@ -57,14 +57,14 @@ async def start_application_creation(update: Update, context: ContextTypes.DEFAU
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
-        await update.message.reply_text("Оберіть категорію:", reply_markup=reply_markup)
+        await update.message.reply_text("📋 **Оберіть категорію:**", reply_markup=reply_markup)
 
         context.user_data["categories"] = categories
         return ENTER_CATEGORY_ID
 
     except Exception as e:
-        await update.message.reply_text(f"Помилка отримання категорій: {e}")
-        await update.message.reply_text("Повертаюсь до головного меню.", reply_markup=MAIN_KEYBOARD)
+        await update.message.reply_text(f"⚠️ **Помилка отримання категорій:** {e}")
+        await update.message.reply_text("🔙 Повертаємось до головного меню.", reply_markup=MAIN_KEYBOARD)
         return ConversationHandler.END
 
 
@@ -87,12 +87,11 @@ async def select_category(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
-        await query.edit_message_text("Оберіть підкатегорію:", reply_markup=reply_markup)
+        await query.edit_message_text("📋 **Оберіть підкатегорію:**", reply_markup=reply_markup)
         return ENTER_CATEGORY_ID
     else:
-        await query.edit_message_text(f"Вибрано категорію ID {category_id}. Введіть опис вашої заявки:")
+        await query.edit_message_text(f"✅ **Вибрано категорію ID {category_id}.**\n📝 **Введіть опис вашої заявки:**")
         return ENTER_DESCRIPTION
-
 
 
 async def get_description(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -102,25 +101,24 @@ async def get_description(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         return await cancel_application(update, context)
 
     if not description:
-        await update.message.reply_text("Опис не може бути порожнім. Введіть опис заявки:")
+        await update.message.reply_text("❌ **Опис не може бути порожнім. Введіть опис заявки:**")
         return ENTER_DESCRIPTION
 
-
     if len(description) > 256:
-        await update.message.reply_text("Опис не може перевищувати 256 символів. Введіть коротший опис:")
+        await update.message.reply_text("❌ **Опис не може перевищувати 256 символів.** Введіть коротший опис:")
         return ENTER_DESCRIPTION
 
     context.user_data["description"] = description
 
     keyboard = [
-        [KeyboardButton("Так, я на телефоні")],
-        [KeyboardButton("Ні, я використовую ПК")],
-        [KeyboardButton("Скасувати подачу заявки")],
+        [KeyboardButton("📱 Так, я на телефоні")],
+        [KeyboardButton("💻 Ні, я використовую ПК")],
+        [KeyboardButton("❌ Скасувати подачу заявки")],
     ]
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
 
     await update.message.reply_text(
-        "Ви працюєте з телефону чи ПК? Це допоможе нам правильно запросити вашу локацію.",
+        "📍 **Ви працюєте з телефону чи ПК?** Це допоможе нам правильно запросити вашу локацію.",
         reply_markup=reply_markup
     )
     return ENTER_LOCATION
@@ -133,33 +131,48 @@ async def get_location(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     """Обробка локації залежно від вибору пристрою або введення користувача."""
 
     if update.message.text:
-        user_response = update.message.text.strip().lower()
+        user_response = update.message.text.strip()
 
-        if user_response == "скасувати подачу заявки":
+        if user_response == "❌ Скасувати подачу заявки":
             return await cancel_application(update, context)
 
-        elif user_response == "так, я на телефоні":
+        elif user_response == "📱 Так, я на телефоні":
 
-            keyboard = [[KeyboardButton("Поділитися локацією", request_location=True)],
-                        [KeyboardButton("Скасувати подачу заявки")]]
+            keyboard = [[KeyboardButton("📍 Поділитися локацією", request_location=True)],
+                        [KeyboardButton("❌ Скасувати подачу заявки")]]
             reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=False)
 
             await update.message.reply_text(
-                "Надішліть вашу локацію, натиснувши кнопку нижче:",
-                reply_markup=reply_markup
+                "🔔 **Інструкція для користувача мобільного телефону:**\n\n"
+                "1. **Увімкніть місцезнаходження:**\n"
+                "   - Для **Android**: Перейдіть до налаштувань → \"Місцезнаходження\" і увімкніть його.\n"
+                "   - Для **iPhone**: Перейдіть до налаштувань → \"Конфіденційність\" → \"Місцезнаходження\" і увімкніть його.\n\n"
+                "   - Натисніть кнопку \"📍 Поділитися локацією\".\n"
+                "2. **Якщо ви хочете вибрати іншу точку на карті:**\n"
+                "   - **Вимкніть місцезнаходження** в налаштуваннях телефону.\n"
+                "   - Натисніть кнопку \"📍 Поділитися локацією\".\n"
+                "   - З'явиться вікно з картою, де ви зможете вручну вибрати точку або перемістити маркер на правильне місце.\n"
+                "   - Після вибору потрібної точки, підтвердіть локацію і надішліть її.",
+                reply_markup=reply_markup, parse_mode="Markdown"
             )
             return ENTER_LOCATION
 
-        elif user_response == "ні, я використовую пк":
+        elif user_response == "💻 Ні, я використовую пк":
+            keyboard = [[KeyboardButton("❌ Скасувати подачу заявки")]]
+            reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=False)
 
             await update.message.reply_text(
-                "Ви можете знайти вашу адресу чи координати за допомогою Google Maps. Перейдіть за посиланням:\n"
-                "[Google Maps](https://www.google.com/maps)\n\n"
-                "Скопіюйте адресу чи координати та вставте їх у повідомленні.",
-                parse_mode="Markdown"
+                "💻 **Як знайти координати за допомогою Google Maps на ПК:**\n\n"
+                "1️⃣ Відкрийте [Google Maps](https://www.google.com/maps) у вашому браузері.\n"
+                "2️⃣ Знайдіть своє місцезнаходження на карті, натиснувши на потрібну точку лівою кнопкою миші (ЛКМ).\n"
+                "3️⃣ Наведіть курсор на крапку, яка з'явилася на карті (ваше місцезнаходження) та натисніть праву кнопку миші (ПКМ).\n"
+                "4️⃣ У меню, що з'явиться, клацніть на координати лівою кнопкою миші (ЛКМ).\n"
+                "5️⃣ Координати (широта та довгота) автоматично скопіюються в буфер обміну.\n"
+                "6️⃣ Поверніться до цього чату і натисніть праву кнопку миші (ПКМ) у текстовому полі чату, а потім виберіть **'Вставити'**.\n"
+                "   Також можна використати комбінацію клавіш **Ctrl + V** для вставлення.\n\n"
+                "📍 **Приклад координат:** `49.2827, -123.1216`", parse_mode="Markdown", reply_markup=reply_markup
             )
             return ENTER_LOCATION
-
 
         coordinates_match = re.match(r"^(-?\d+(\.\d+)?),\s*(-?\d+(\.\d+)?)$", user_response)
         if coordinates_match:
@@ -168,13 +181,14 @@ async def get_location(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
             longitude = float(coordinates_match.group(3))
             context.user_data["location"] = {"latitude": latitude, "longitude": longitude}
 
-
             address = await reverse_geocode(latitude, longitude)
             context.user_data["location"]["address"] = address
 
             await update.message.reply_text(
-                f"Координати отримано. Визначена адреса: {address}.\n"
-                "Введіть дату, до якої заявка буде активною (у форматі ДД.ММ.РРРР 00:00):"
+                f"🎉 **Координати отримано!**\n"
+                f"📍 **Адреса:** {address}\n\n"
+                "🗓️ Тепер введіть дату, до якої заявка буде активною (у форматі ДД.ММ.РРРР 00:00):",
+                parse_mode="Markdown"
             )
             return ENTER_ACTIVE_TO
 
@@ -182,9 +196,11 @@ async def get_location(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
 
             context.user_data["location"] = {"address": user_response}
             await update.message.reply_text(
-                "Адресу отримано. Введіть дату, до якої заявка буде активною (у форматі ДД.ММ.РРРР 00:00):"
+                "🎉 **Адресу отримано!**\n\n"
+                "🗓️ Тепер введіть дату, до якої заявка буде активною (у форматі ДД.ММ.РРРР 00:00):"
             )
             return ENTER_ACTIVE_TO
+
 
 
     elif update.message.location:
@@ -193,12 +209,11 @@ async def get_location(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
             "longitude": update.message.location.longitude,
         }
         await update.message.reply_text(
-            "Локацію отримано. Введіть дату, до якої заявка буде активною (у форматі ДД.ММ.РРРР 00:00):"
+            "📍 **Локацію отримано!**\n\n"
+            "🗓️ Тепер введіть дату, до якої заявка буде активною (у форматі ДД.ММ.РРРР 00:00):"
         )
         return ENTER_ACTIVE_TO
-
-
-    await update.message.reply_text("Будь ласка, надішліть вашу локацію, координати або введіть адресу вручну.")
+    await update.message.reply_text("🚫 Будь ласка, надішліть вашу локацію або введіть адресу вручну. 📍")
     return ENTER_LOCATION
 
 
@@ -222,9 +237,9 @@ async def reverse_geocode(latitude: float, longitude: float) -> str:
                 if data["status"] == "OK" and data["results"]:
                     return data["results"][0]["formatted_address"]
                 else:
-                    return "Адреса не знайдена"
+                    return "Адресу не вдалося знайти 😔"
     except Exception as e:
-        return f"Помилка геокодування: {e}"
+        return f"❌ Помилка геокодування: {e}"
 
 
 async def get_active_to(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -234,36 +249,36 @@ async def get_active_to(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
 
     if "latitude" in location and "longitude" in location:
         address = await reverse_geocode(location["latitude"], location["longitude"])
-        location_info = f"Адреса: {address}"
+        location_info = f"📍 **Адреса:** {address}"
     elif "address" in location:
-        location_info = f"Адреса: {location['address']}"
+        location_info = f"📍 **Адреса:** {location['address']}"
     else:
-        location_info = "Локація не вказана"
+        location_info = "🚫 Локація не вказана."
 
     active_to = update.message.text.strip()
     context.user_data["active_to"] = active_to
 
     confirmation_message = (
-        f"Перевірте введені дані:\n"
-        f"- Категорія ID: {user_data.get('category_id')}\n"
-        f"- Опис: {user_data.get('description')}\n"
+        f"✅ **Перевірте введені дані:**\n"
+        f"- 🆔 **Категорія ID:** {user_data.get('category_id')}\n"
+        f"- 📋 **Опис:** {user_data.get('description')}\n"
         f"- {location_info}\n"
-        f"- Активна до: {active_to}"
+        f"- 🗓️ **Активна до:** {active_to}"
     )
 
     keyboard = [
-        [InlineKeyboardButton("Підтвердити", callback_data="confirm_application")],
+        [InlineKeyboardButton("✅ Підтвердити", callback_data="confirm_application")],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     await update.message.reply_text(confirmation_message, reply_markup=reply_markup)
     cancel_keyboard = ReplyKeyboardMarkup(
-        [[KeyboardButton("Скасувати подачу заявки")]],
+        [[KeyboardButton("❌ Скасувати подачу заявки")]],
         resize_keyboard=True,
         one_time_keyboard=False
     )
     await update.message.reply_text(
-        "Якщо потрібно скасувати заявку, натисніть кнопку нижче:",
+        "❗ Якщо потрібно скасувати заявку, натисніть кнопку нижче:",
         reply_markup=cancel_keyboard
     )
     return CONFIRM_DATA
@@ -334,9 +349,8 @@ async def confirm_application(update: Update, context: ContextTypes.DEFAULT_TYPE
             active_to=user_data["active_to"],
             access_token=access_token,
         )
-        await query.edit_message_text(f"Заявка успішно створена! 🎉\nID: {result['id']}")
+        await query.edit_message_text(f"🎉 **Заявка успішно створена!**\nID: {result['id']}")
     except Exception as e:
-
         if "401" in str(e):
             try:
                 access_token = await ensure_valid_token(context)
@@ -350,14 +364,14 @@ async def confirm_application(update: Update, context: ContextTypes.DEFAULT_TYPE
                     active_to=user_data["active_to"],
                     access_token=access_token,
                 )
-                await query.edit_message_text(f"Заявка успішно створена! 🎉\nID: {result['id']}")
+                await query.edit_message_text(f"🎉 **Заявка успішно створена!**\nID: {result['id']}")
             except Exception as refresh_error:
-                await query.edit_message_text(f"Помилка при оновленні токена: {refresh_error}")
+                await query.edit_message_text(f"❌ Помилка при оновленні токена: {refresh_error}")
                 return ConversationHandler.END
         else:
-            await query.edit_message_text(f"Помилка при створенні заявки: {e}")
+            await query.edit_message_text(f"❌ Помилка при створенні заявки: {e}")
 
-    await query.message.reply_text("Повертаюсь до головного меню.", reply_markup=MAIN_KEYBOARD)
+    await query.message.reply_text("🔙 Повертаємось до головного меню.", reply_markup=MAIN_KEYBOARD)
     return ConversationHandler.END
 
 
@@ -366,11 +380,11 @@ async def cancel_application(update: Update, context: ContextTypes.DEFAULT_TYPE)
     query = update.callback_query
     if query:
         await query.answer()
-        await query.edit_message_text("Процес створення заявки скасовано.")
+        await query.edit_message_text("❌ **Процес створення заявки скасовано.**")
     else:
-        await update.message.reply_text("Процес створення заявки скасовано.")
+        await update.message.reply_text("❌ **Процес створення заявки скасовано.**")
 
-    await update.message.reply_text("Повертаюсь до головного меню.", reply_markup=MAIN_KEYBOARD)
+    await update.message.reply_text("🔙 Повертаємось до головного меню.", reply_markup=MAIN_KEYBOARD)
     return ConversationHandler.END
 
 
@@ -379,24 +393,24 @@ application_creation_handler = ConversationHandler(
     states={
         ENTER_CATEGORY_ID: [
             CallbackQueryHandler(select_category, pattern=r"^parent_\d+$"),
-            MessageHandler(filters.TEXT & filters.Regex("^Скасувати подачу заявки$"), cancel_application),
+            MessageHandler(filters.TEXT & filters.Regex("^❌ Скасувати подачу заявки$"), cancel_application),
         ],
         ENTER_DESCRIPTION: [
             MessageHandler(filters.TEXT & ~filters.COMMAND, get_description),
-            MessageHandler(filters.TEXT & filters.Regex("^Скасувати подачу заявки$"), cancel_application),
+            MessageHandler(filters.TEXT & filters.Regex("^❌ Скасувати подачу заявки$"), cancel_application),
         ],
         ENTER_LOCATION: [
             MessageHandler(filters.LOCATION, get_location),
             MessageHandler(filters.TEXT & ~filters.COMMAND, get_location),
-            MessageHandler(filters.TEXT & filters.Regex("^Скасувати подачу заявки$"), cancel_application),
+            MessageHandler(filters.TEXT & filters.Regex("^❌ Скасувати подачу заявки$"), cancel_application),
         ],
         ENTER_ACTIVE_TO: [
             MessageHandler(filters.TEXT & ~filters.COMMAND, get_active_to),
-            MessageHandler(filters.TEXT & filters.Regex("^Скасувати подачу заявки$"), cancel_application),
+            MessageHandler(filters.TEXT & filters.Regex("^❌ Скасувати подачу заявки$"), cancel_application),
         ],
         CONFIRM_DATA: [
             CallbackQueryHandler(confirm_application, pattern="^confirm_application$"),
-            MessageHandler(filters.TEXT & filters.Regex("^Скасувати подачу заявки$"), cancel_application),
+            MessageHandler(filters.TEXT & filters.Regex("^❌ Скасувати подачу заявки$"), cancel_application),
         ],
     },
     fallbacks=[CommandHandler("cancel", cancel_application)],

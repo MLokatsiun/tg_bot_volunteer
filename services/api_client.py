@@ -422,7 +422,7 @@ async def deactivate_beneficiary_profile(access_token: str) -> bool:
 
 
 import httpx
-from typing import Optional
+from typing import Optional, Dict
 
 
 async def create_application(description: str, category_id: Optional[int], address: Optional[str],
@@ -638,3 +638,33 @@ async def refresh_moderator_token(refresh_token: str) -> dict:
             else:
                 error_message = await response.text()
                 raise Exception(f"Failed to refresh token: {error_message}")
+
+
+async def get_user_info(tg_id: str, role_id: int, client: str, password: str) -> Optional[Dict]:
+    """Функція для перевірки, чи є користувач в базі через API."""
+    url = "https://bot.bckwdd.fun/auth/user/"  # Замість цього вкажіть правильний ендпоінт
+    headers = {
+        "Content-Type": "application/json",
+    }
+    body = {
+        "tg_id": tg_id,
+        "role_id": role_id,
+        "client": client,
+        "password": password
+    }
+
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, json=body, headers=headers) as response:
+                if response.status == 200:
+                    user_data = await response.json()
+                    return user_data
+                elif response.status == 404:
+                    return None  # Користувача не знайдено
+                else:
+                    error_message = await response.json()
+                    print(f"Error: {error_message.get('detail', 'Unknown error')}")
+                    return None
+    except Exception as e:
+        print(f"Error during API request: {e}")
+        return None

@@ -61,9 +61,9 @@ START_KEYBOARD = ReplyKeyboardMarkup(
 
 async def choose_application_type_for_beneficiary(update, context):
     keyboard = [
-        [InlineKeyboardButton("В доступі", callback_data='accessible')],
-        [InlineKeyboardButton("В процесі", callback_data='is_progressing')],
-        [InlineKeyboardButton("Виконані", callback_data='complete')]
+        [InlineKeyboardButton("🟢 В доступі", callback_data='accessible')],
+        [InlineKeyboardButton("🟠 В процесі", callback_data='is_progressing')],
+        [InlineKeyboardButton("✅ Виконані", callback_data='complete')]
     ]
 
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -72,6 +72,7 @@ async def choose_application_type_for_beneficiary(update, context):
         reply_markup=reply_markup
     )
 
+
 async def application_type_button_handler(update, context):
     query = update.callback_query
     application_type = query.data
@@ -79,107 +80,39 @@ async def application_type_button_handler(update, context):
     try:
         access_token = await ensure_valid_token(context)
     except Exception as e:
-        await query.answer(text="Ви не авторизовані або виникла помилка з токеном. Спробуйте знову.")
+        await query.answer(text="🚫 Ви не авторизовані або виникла помилка з токеном. Спробуйте знову.")
         return
 
     try:
         applications = await get_applications_by_type(access_token, application_type, "beneficiary")
 
         if isinstance(applications, dict) and 'detail' in applications:
-            await query.edit_message_text(f"Помилка при отриманні заявок: {applications['detail']}")
+            await query.edit_message_text(f"❌ Помилка при отриманні заявок: {applications['detail']}")
         elif not applications:
-            await query.edit_message_text(f"Немає заявок із типом '{application_type}'.")
+            await query.edit_message_text(f"❌ Немає заявок із типом '{application_type}'.")
         else:
             applications = sorted(applications, key=lambda x: x['id'])
 
+            # Зберігаємо заявки у користувацьких даних
             context.user_data["applications_list"] = applications
-            context.user_data["current_page"] = 0
 
-            response_text, reply_markup = await generate_paginated_response(
-                applications, application_type, 0
-            )
-            await query.edit_message_text(response_text, reply_markup=reply_markup)
+            response_text = "Заявки з типом '{}' (відсортовані за ID):\n\n".format(application_type)
+
+            # Формуємо текст для відображення всіх заявок
+            for app in applications:
+                description = app.get("description", "Немає опису")
+                active_to = app.get("active_to", "Немає дати")
+
+                response_text += (
+                    f"📝 Заявка {app['id']}:\n"
+                    f"📋 Опис: {description}\n"
+                    f"📅 Активна до: {active_to}\n\n"
+                )
+
+            await query.edit_message_text(response_text)
 
     except Exception as e:
-        await query.edit_message_text(f"Помилка при отриманні заявок: {str(e)}")
-
-
-async def generate_paginated_response(applications, application_type, page):
-    """Формує текст і клавіатуру для пагінації заявок."""
-    start = page * ITEMS_PER_PAGE
-    end = start + ITEMS_PER_PAGE
-    paginated_apps = applications[start:end]
-
-    response_text = f"Заявки з типом '{application_type}':\n\n"
-
-    def format_date(date_str):
-        if date_str:
-            try:
-                date_obj = datetime.fromisoformat(date_str)
-                return date_obj.strftime("%d.%m.%Y %H:%M")
-            except ValueError:
-                return "Невірний формат дати"
-        return "Не вказано"
-
-    for app in paginated_apps:
-        if app is None:
-            continue
-
-        description = app.get("description", "Немає опису")
-        active_to = app.get("active_to", "Немає дати")
-
-        if application_type != "accessible":
-            creator = app.get("executor", {})
-            first_name = creator.get("first_name", "Невідомо")
-            phone_num = creator.get("phone_num", "Невідомо")
-            creator_info = f"Автор: {first_name}, Телефон: {phone_num}"
-        else:
-            creator_info = ""
-
-        active_to_formatted = format_date(active_to)
-
-        response_text += (
-            f"Заявка {app['id']}:\n"
-            f"Опис: {description}\n"
-            f"Активна до: {active_to_formatted}\n"
-            f"{creator_info}\n\n"
-        )
-
-    keyboard = []
-    total_pages = (len(applications) + ITEMS_PER_PAGE - 1) // ITEMS_PER_PAGE
-
-    nav_buttons = []
-    if page > 0:
-        nav_buttons.append(InlineKeyboardButton("⬅️ Назад", callback_data=f"{application_type}|{page - 1}"))
-    if page < total_pages - 1:
-        nav_buttons.append(InlineKeyboardButton("Вперед ➡️", callback_data=f"{application_type}|{page + 1}"))
-
-    if nav_buttons:
-        keyboard.append(nav_buttons)
-
-    reply_markup = InlineKeyboardMarkup(keyboard)
-
-    return response_text, reply_markup
-
-
-async def navigate_pages(update, context):
-    """Обробляє кнопки пагінації."""
-    query = update.callback_query
-    data = query.data.split('|')
-    application_type = data[0]
-    page = int(data[1])
-
-    applications = context.user_data.get("applications_list", [])
-
-    if not applications:
-        await query.edit_message_text("Немає заявок для відображення.")
-        return
-
-    response_text, reply_markup = await generate_paginated_response(
-        applications, application_type, page
-    )
-    await query.edit_message_text(response_text, reply_markup=reply_markup)
-
+        await query.edit_message_text(f"❌ Помилка при отриманні заявок: {str(e)}")
 
 
 async def view_all_applications(query, context):
@@ -190,29 +123,29 @@ async def view_all_applications(query, context):
     try:
         access_token = await ensure_valid_token(context)
     except Exception as e:
-        await query.answer(text="Ви не авторизовані або виникла помилка з токеном. Спробуйте знову.")
+        await query.answer(text="🚫 Ви не авторизовані або виникла помилка з токеном. Спробуйте знову.")
         return
 
     try:
         applications = await get_applications_by_type(access_token, 'all', "beneficiary")
 
         if not applications:
-            await query.edit_message_text(f"Немає доступних заявок.")
+            await query.edit_message_text(f"❌ Немає доступних заявок.")
         else:
 
             applications = sorted(applications, key=lambda x: x['id'])
 
-            response_text = "Всі заявки:\n\n"
+            response_text = "📝 Всі заявки (відсортовані за ID):\n\n"
             for app in applications:
                 description = app.get("description", "Немає опису")
                 active_to = app.get("active_to", "Немає дати")
 
                 response_text += (
-                    f"ID заявки: {app['id']}\n"
-                    f"Опис: {description}\n"
-                    f"Активна до: {active_to}\n\n"
+                    f"📝 Заявка {app['id']}:\n"
+                    f"📋 Опис: {description}\n"
+                    f"📅 Активна до: {active_to}\n\n"
                 )
             await query.edit_message_text(response_text)
     except Exception as e:
         logging.error(f"Error fetching applications: {str(e)}")
-        await query.edit_message_text(f"Помилка при отриманні заявок: {str(e)}")
+        await query.edit_message_text(f"❌ Помилка при отриманні заявок: {str(e)}")

@@ -68,12 +68,12 @@ async def ensure_valid_token(context: ContextTypes.DEFAULT_TYPE) -> str:
 async def start_deactivation(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Запит на деактивацію профілю волонтера."""
     keyboard = [
-        [KeyboardButton("Так, деактивувати мій профіль")],
-        [KeyboardButton("Ні, скасувати деактивацію")],
+        [KeyboardButton("✅ Так, деактивувати мій профіль")],
+        [KeyboardButton("❌ Ні, скасувати деактивацію")],
     ]
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
     await update.message.reply_text(
-        "Ви впевнені, що хочете деактивувати свій профіль бенефіціара? Це незворотна дія.",
+        "⚠️ Ви впевнені, що хочете деактивувати свій профіль бенефіціара? Це незворотна дія.",
         reply_markup=reply_markup,
     )
     return ENTER_DEACTIVATION_CONFIRMATION_VOLUNTEER
@@ -84,27 +84,26 @@ async def confirm_deactivation(update: Update, context: ContextTypes.DEFAULT_TYP
     text = update.message.text.lower()
 
     if text == "так, деактивувати мій профіль".lower():
-
         access_token = await ensure_valid_token(context)
 
         result = await deactivate_beneficiary_profile(access_token)
         if result:
-            await update.message.reply_text("Ваш профіль бенефіціара успішно деактивовано.")
+            await update.message.reply_text("✅ Ваш профіль бенефіціара успішно деактивовано.")
 
             await update.message.reply_text(
-                "Будь ласка, зареєструйтеся або авторизуйтеся для подальшої роботи:",
+                "🔑 Будь ласка, зареєструйтеся або авторизуйтеся для подальшої роботи:",
                 reply_markup=AUTH_KEYBOARD,
             )
         else:
-            await update.message.reply_text("Сталася помилка при деактивації профілю.")
+            await update.message.reply_text("⚠️ Сталася помилка при деактивації профілю.")
 
-            await update.message.reply_text("Повертаюсь до головного меню:", reply_markup=MAIN_KEYBOARD)
+            await update.message.reply_text("🔙 Повертаюсь до головного меню:", reply_markup=MAIN_KEYBOARD)
     elif text == "ні, скасувати деактивацію".lower():
-        await update.message.reply_text("Деактивація профілю волонтера скасована.")
+        await update.message.reply_text("❌ Деактивація профілю волонтера скасована.")
 
-        await update.message.reply_text("Повертаюсь до головного меню:", reply_markup=MAIN_KEYBOARD)
+        await update.message.reply_text("🔙 Повертаюсь до головного меню:", reply_markup=MAIN_KEYBOARD)
     else:
-        await update.message.reply_text("Будь ласка, виберіть одну з наданих опцій.")
+        await update.message.reply_text("⚠️ Будь ласка, виберіть одну з наданих опцій.")
 
     return ConversationHandler.END
 

@@ -60,7 +60,7 @@ async def reset_to_start_menu(context: ContextTypes.DEFAULT_TYPE):
 
     await context.bot.send_message(
         chat_id=context.user_data.get("chat_id"),
-        text="Термін дії вашого сеансу закінчився. Повертаємось до головного меню.",
+        text="❗️Термін дії вашого сеансу закінчився. Повертаємось до головного меню.",
         reply_markup=START_KEYBOARD
     )
 
@@ -68,7 +68,7 @@ async def reset_to_start_menu(context: ContextTypes.DEFAULT_TYPE):
 async def start_confirming_finished_applications(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Початок процесу підтвердження завершених заявок."""
     if not context.user_data.get("access_token"):
-        await update.message.reply_text("Ви не авторизовані. Спочатку виконайте вхід до системи.")
+        await update.message.reply_text("❌ Ви не авторизовані. Спочатку виконайте вхід до системи.")
         return ConversationHandler.END
 
 
@@ -78,7 +78,7 @@ async def start_confirming_finished_applications(update: Update, context: Contex
 
         applications = await get_applications_by_type(access_token, application_type="complete", role="beneficiary")
         if not applications:
-            await update.message.reply_text("Наразі немає завершених заявок для підтвердження.")
+            await update.message.reply_text("🔍 Наразі немає завершених заявок для підтвердження.")
             return ConversationHandler.END
 
 
@@ -87,15 +87,15 @@ async def start_confirming_finished_applications(update: Update, context: Contex
             for app in applications
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
-        await update.message.reply_text("Оберіть завершену заявку зі списку для підтвердження:", reply_markup=reply_markup)
+        await update.message.reply_text("📋 Оберіть завершену заявку зі списку для підтвердження:", reply_markup=reply_markup)
 
         return CHOOSE_FINISHED_APPLICATION
 
-    except PermissionError as e:
-        await update.message.reply_text(f"Помилка доступу: {str(e)}")
-    except Exception as e:
-        await update.message.reply_text(f"Сталася помилка: {str(e)}")
 
+    except PermissionError as e:
+        await update.message.reply_text(f"🚫 Помилка доступу: {str(e)}")
+    except Exception as e:
+        await update.message.reply_text(f"⚠️ Сталася помилка: {str(e)}")
     return ConversationHandler.END
 
 async def choose_finished_application(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -110,15 +110,14 @@ async def choose_finished_application(update: Update, context: ContextTypes.DEFA
 
     context.user_data["selected_application_id"] = application_id
 
-
     keyboard = [
-        [InlineKeyboardButton("Підтвердити", callback_data="confirm")],
-        [InlineKeyboardButton("Скасувати", callback_data="cancel")]
+        [InlineKeyboardButton("✅ Підтвердити", callback_data="confirm")],
+        [InlineKeyboardButton("❌ Скасувати", callback_data="cancel")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     await query.edit_message_text(
-        text=f"Ви вибрали заявку з ID: {application_id}. Підтвердьте її виконання або скасуйте:",
+        text=f"📝 Ви вибрали заявку з ID: {application_id}. Підтвердьте її виконання або скасуйте:",
         reply_markup=reply_markup
     )
     return CONFIRM_APPLICATION
@@ -129,7 +128,7 @@ async def confirm_finished_application(update: Update, context: ContextTypes.DEF
     await query.answer()
 
     if query.data == "cancel":
-        await query.edit_message_text("Підтвердження заявки скасовано.")
+        await query.edit_message_text("🚫 Підтвердження заявки скасовано.")
         return ConversationHandler.END
 
     application_id = context.user_data.get("selected_application_id")
@@ -138,14 +137,14 @@ async def confirm_finished_application(update: Update, context: ContextTypes.DEF
     print(f"Retrieved application ID: {application_id}")
 
     if not application_id:
-        await query.edit_message_text("Помилка: ID заявки не знайдено. Спробуйте знову.")
+        await query.edit_message_text("⚠️ Помилка: ID заявки не знайдено. Спробуйте знову.")
         return ConversationHandler.END
 
     try:
 
         access_token = await ensure_valid_token(context)
     except Exception as e:
-        await query.edit_message_text(f"Сталася помилка при перевірці токена: {str(e)}")
+        await query.edit_message_text(f"🚨 Сталася помилка при перевірці токена: {str(e)}")
         return ConversationHandler.END
 
     try:
@@ -155,18 +154,18 @@ async def confirm_finished_application(update: Update, context: ContextTypes.DEF
 
 
         await confirm_application(application_id=application_id, access_token=access_token)
-        await query.edit_message_text(f"Заявка з ID {application_id} успішно підтверджена!")
+        await query.edit_message_text(f"✅ Заявка з ID {application_id} успішно підтверджена!")
     except ValueError:
-        await query.edit_message_text("Помилка: ID заявки має бути числовим.")
+        await query.edit_message_text("⚠️ Помилка: ID заявки має бути числовим.")
     except Exception as e:
-        await query.edit_message_text(f"Сталася помилка: {str(e)}")
+        await query.edit_message_text(f"⚠️ Сталася помилка: {str(e)}")
 
     return ConversationHandler.END
 
 
 async def cancel_confirming_application(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Скасування підтвердження заявки."""
-    await update.message.reply_text("Процес підтвердження заявки скасовано.")
+    await update.message.reply_text("❌ Процес підтвердження заявки скасовано.")
     return ConversationHandler.END
 
 

@@ -56,7 +56,7 @@ async def reset_to_start_menu(context: ContextTypes.DEFAULT_TYPE):
 
     await context.bot.send_message(
         chat_id=context.user_data.get("chat_id"),
-        text="Термін дії вашого сеансу закінчився. Повертаємось до головного меню.",
+        text="❗️ Термін дії вашого сеансу закінчився. Повертаємось до головного меню.",
         reply_markup=START_KEYBOARD
     )
 
@@ -64,31 +64,29 @@ async def reset_to_start_menu(context: ContextTypes.DEFAULT_TYPE):
 async def start_accessible_application_deletion(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Початок процесу видалення заявок з типом `accessible`."""
     if not context.user_data.get("access_token"):
-        await update.message.reply_text("Ви не авторизовані. Спочатку виконайте вхід до системи.")
+        await update.message.reply_text("❌ Ви не авторизовані. Спочатку виконайте вхід до системи.")
         return ConversationHandler.END
 
     access_token = await ensure_valid_token(context)
 
     try:
-
         applications = await get_applications_by_type(access_token, application_type="accessible", role="beneficiary")
         if not applications:
-            await update.message.reply_text("Наразі немає доступних заявок для видалення.")
+            await update.message.reply_text("🔍 Наразі немає доступних заявок для видалення.")
             return ConversationHandler.END
 
         keyboard = [
-            [InlineKeyboardButton(f"ID: {app['id']} | {app['description']}", callback_data=str(app["id"]))]
-            for app in applications
+            [InlineKeyboardButton(f"ID: {app['id']} | {app['description']}", callback_data=str(app["id"]))] for app in applications
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
-        await update.message.reply_text("Оберіть заявку зі списку для видалення:", reply_markup=reply_markup)
+        await update.message.reply_text("📋 Оберіть заявку зі списку для видалення:", reply_markup=reply_markup)
 
         return CHOOSE_ACCESSIBLE_APPLICATION
 
     except PermissionError as e:
-        await update.message.reply_text(f"Помилка доступу: {str(e)}")
+        await update.message.reply_text(f"🚫 Помилка доступу: {str(e)}")
     except Exception as e:
-        await update.message.reply_text(f"Сталася помилка: {str(e)}")
+        await update.message.reply_text(f"⚠️ Сталася помилка: {str(e)}")
 
     return ConversationHandler.END
 
@@ -102,13 +100,13 @@ async def choose_accessible_application(update: Update, context: ContextTypes.DE
     context.user_data["application_id"] = application_id
 
     keyboard = [
-        [InlineKeyboardButton("Підтвердити видалення", callback_data="confirm_delete")],
-        [InlineKeyboardButton("Скасувати", callback_data="cancel_delete")]
+        [InlineKeyboardButton("✅ Підтвердити видалення", callback_data="confirm_delete")],
+        [InlineKeyboardButton("❌ Скасувати", callback_data="cancel_delete")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     await query.edit_message_text(
-        text=f"Ви вибрали заявку з ID: {application_id}. Ви дійсно хочете її видалити?",
+        text=f"📝 Ви вибрали заявку з ID: {application_id}. Ви дійсно хочете її видалити?",
         reply_markup=reply_markup
     )
     return CONFIRM_DELETE
@@ -120,30 +118,29 @@ async def confirm_accessible_application_deletion(update: Update, context: Conte
     await query.answer()
 
     if query.data == "cancel_delete":
-        await query.edit_message_text("Видалення заявки скасовано.")
+        await query.edit_message_text("🚫 Видалення заявки скасовано.")
         return ConversationHandler.END
 
     application_id = context.user_data.get("application_id")
 
     if not application_id:
-        await query.edit_message_text("Помилка: ID заявки не знайдено. Спробуйте знову.")
+        await query.edit_message_text("⚠️ Помилка: ID заявки не знайдено. Спробуйте знову.")
         return ConversationHandler.END
 
     access_token = await ensure_valid_token(context)
 
     try:
-
         await delete_application(application_id=int(application_id), access_token=access_token)
-        await query.edit_message_text(f"Заявка з ID {application_id} успішно видалена!")
+        await query.edit_message_text(f"✅ Заявка з ID {application_id} успішно видалена!")
     except Exception as e:
-        await query.edit_message_text(f"Сталася помилка: {str(e)}")
+        await query.edit_message_text(f"⚠️ Сталася помилка: {str(e)}")
 
     return ConversationHandler.END
 
 
 async def cancel_accessible_application_deletion(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Скасування видалення заявки."""
-    await update.message.reply_text("Процес видалення заявки скасовано.")
+    await update.message.reply_text("❌ Процес видалення заявки скасовано.")
     return ConversationHandler.END
 
 
