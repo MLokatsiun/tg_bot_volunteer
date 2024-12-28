@@ -16,26 +16,25 @@ ENTER_LOCATION, ENTER_CATEGORIES, CONFIRM_EDIT = range(3)
 async def start_edit_profile(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Початок редагування профілю волонтера."""
     if not context.user_data.get("access_token"):
-        await update.message.reply_text("Ви не авторизовані. Спочатку виконайте вхід до системи.")
+        await update.message.reply_text("❗ Ви не авторизовані. Спочатку виконайте вхід до системи.")
         return ConversationHandler.END
 
-
     keyboard = [
-        [KeyboardButton("Я на телефоні")],
-        [KeyboardButton("Я використовую ПК")],
-        [KeyboardButton("Пропустити")],
-        [KeyboardButton("Скасувати редагування")],
+        [KeyboardButton("📱 Я на телефоні")],
+        [KeyboardButton("💻 Я використовую ПК")],
+        [KeyboardButton("🚫 Пропустити")],
+        [KeyboardButton("❌ Скасувати редагування")],
     ]
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=False)
     await update.message.reply_text(
-        "Поділіться вашою новою локацією, введіть адресу або оберіть спосіб введення:",
+        "🔄 Поділіться вашою новою локацією, введіть адресу або оберіть спосіб введення:",
         reply_markup=reply_markup
     )
     return ENTER_LOCATION
 
 async def skip_location(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Пропуск введення локації."""
-    await update.message.reply_text("Локація залишиться незмінною.")
+    await update.message.reply_text("📍 Локація залишиться незмінною. 🔄")
 
     return await enter_location(update, context)
 
@@ -44,37 +43,49 @@ async def enter_location(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     if update.message.text:
         user_response = update.message.text.strip().lower()
 
-        if user_response == "скасувати редагування":
+        if user_response == "❌ скасувати редагування":
             return await cancel_edit(update, context)
 
-
-        if user_response == "пропустити":
-            await update.message.reply_text("Локація залишиться незмінною.")
+        if user_response == "🚫 пропустити":
+            await update.message.reply_text("📍 Локація залишиться незмінною.")
             return await proceed_to_categories(update, context)
 
-        if user_response == "я на телефоні":
+        if user_response == "📱 я на телефоні":
             keyboard = [
-                [KeyboardButton("Поділитися локацією", request_location=True)],
-                [KeyboardButton("Скасувати редагування")]
+                [KeyboardButton("📍 Поділитися локацією", request_location=True)],
+                [KeyboardButton("❌ Скасувати редагування")]
             ]
             reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
             await update.message.reply_text(
-                "Будь ласка, поділіться вашою локацією за допомогою кнопки нижче:",
-                reply_markup=reply_markup
+                "🔔 **Інструкція для користувача мобільного телефону:**\n\n"
+                "1. **Увімкніть місцезнаходження:**\n"
+                "   - Для **Android**: Перейдіть до налаштувань → \"Місцезнаходження\" і увімкніть його.\n"
+                "   - Для **iPhone**: Перейдіть до налаштувань → \"Конфіденційність\" → \"Місцезнаходження\" і увімкніть його.\n\n"
+                "   - Натисніть кнопку \"📍 Поділитися локацією\".\n"
+                "2. **Якщо ви хочете вибрати іншу точку на карті:**\n"
+                "   - **Вимкніть місцезнаходження** в налаштуваннях телефону.\n"
+                "   - Натисніть кнопку \"📍 Поділитися локацією\".\n"
+                "   - З'явиться вікно з картою, де ви зможете вручну вибрати точку або перемістити маркер на правильне місце.\n"
+                "   - Після вибору потрібної точки, підтвердіть локацію і надішліть її.",
+                reply_markup=reply_markup, parse_mode="Markdown"
             )
             return ENTER_LOCATION
 
-        elif user_response == "я використовую пк":
-            keyboard = [[KeyboardButton("Скасувати редагування")]]
+        elif user_response == "💻 я використовую пк":
+            keyboard = [[KeyboardButton("❌ Скасувати редагування")]]
             reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
             await update.message.reply_text(
-                "Ви можете знайти вашу адресу чи координати за допомогою Google Maps. Перейдіть за посиланням:\n"
-                "[Google Maps](https://www.google.com/maps)\n\n"
-                "Скопіюйте адресу чи координати та вставте їх у повідомленні.",
-                parse_mode="Markdown", reply_markup=reply_markup
+                "💻 **Як знайти координати за допомогою Google Maps на ПК:**\n\n"
+                "1️⃣ Відкрийте [Google Maps](https://www.google.com/maps) у вашому браузері.\n"
+                "2️⃣ Знайдіть своє місцезнаходження на карті, натиснувши на потрібну точку лівою кнопкою миші (ЛКМ).\n"
+                "3️⃣ Наведіть курсор на крапку, яка з'явилася на карті (ваше місцезнаходження) та натисніть праву кнопку миші (ПКМ).\n"
+                "4️⃣ У меню, що з'явиться, клацніть на координати лівою кнопкою миші (ЛКМ).\n"
+                "5️⃣ Координати (широта та довгота) автоматично скопіюються в буфер обміну.\n"
+                "6️⃣ Поверніться до цього чату і натисніть праву кнопку миші (ПКМ) у текстовому полі чату, а потім виберіть **'Вставити'**.\n"
+                "   Також можна використати комбінацію клавіш **Ctrl + V** для вставлення.\n\n"
+                "📍 **Приклад координат:** `49.2827, -123.1216`", parse_mode="Markdown", reply_markup=reply_markup
             )
             return ENTER_LOCATION
-
 
         coordinates_match = re.match(r"^(-?\d+(\.\d+)?),\s*(-?\d+(\.\d+)?)$", user_response)
         if coordinates_match:
@@ -85,20 +96,18 @@ async def enter_location(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 "longitude": longitude
             }
 
-
             address = await reverse_geocode(latitude, longitude)
             context.user_data["edit_location"]["address"] = address
 
             await update.message.reply_text(
-                f"Координати отримано. Визначена адреса: {address}."
+                f"✅ Координати отримано. Визначена адреса: {address}."
             )
             return await proceed_to_categories(update, context)
-
 
         else:
             context.user_data["edit_location"] = {"address": user_response}
             await update.message.reply_text(
-                "Адресу отримано. Переходимо до наступного кроку."
+                "✅ Адресу отримано. Переходимо до наступного кроку."
             )
             return await proceed_to_categories(update, context)
 
@@ -110,17 +119,16 @@ async def enter_location(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             "longitude": longitude
         }
 
-
         address = await reverse_geocode(latitude, longitude)
         context.user_data["edit_location"]["address"] = address
 
         await update.message.reply_text(
-            f"Локацію отримано. Визначена адреса: {address}."
+            f"📍 Локацію отримано. Визначена адреса: {address}."
         )
         return await proceed_to_categories(update, context)
 
     else:
-        await update.message.reply_text("Будь ласка, надішліть вашу локацію, координати або адресу.")
+        await update.message.reply_text("❓ Будь ласка, надішліть вашу локацію, координати або адресу.")
         return ENTER_LOCATION
 
 async def proceed_to_categories(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -169,23 +177,21 @@ async def select_category(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
     callback_data = query.data
 
-
     if callback_data == "finish_selection":
         selected_categories = context.user_data.get("selected_categories", [])
         if not selected_categories:
-            await query.edit_message_text("Ви не обрали жодної категорії.")
+            await query.edit_message_text("⚠️ Ви не обрали жодної категорії.")
             return ENTER_CATEGORIES
 
-        await query.edit_message_text("Категорії обрано.")
+        await query.edit_message_text("✅ Категорії обрано.")
         await query.message.reply_text(
-            "Підтвердити редагування профілю?",
+            "🔄 Підтвердити редагування профілю?",
             reply_markup=ReplyKeyboardMarkup(
-                [[KeyboardButton("Так"), KeyboardButton("Ні")]],
+                [[KeyboardButton("✅ Так"), KeyboardButton("❌ Ні")]],
                 resize_keyboard=True,
             )
         )
         return CONFIRM_EDIT
-
 
     if callback_data == "back_to_parents":
         categories = context.user_data.get("categories", [])
@@ -199,11 +205,11 @@ async def select_category(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             )]
             for cat in parent_categories
         ]
-        keyboard.append([InlineKeyboardButton("Завершити вибір", callback_data="finish_selection")])
+        keyboard.append([InlineKeyboardButton("✅ Завершити вибір", callback_data="finish_selection")])
 
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(
-            "Оберіть категорії (✅ позначено обрані):",
+            "🔄 Оберіть категорії (✅ позначено обрані):",
             reply_markup=reply_markup,
         )
         context.user_data["current_parent_id"] = None
@@ -224,23 +230,19 @@ async def select_category(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     subcategories = [cat for cat in categories if cat["parent_id"] == category_id]
 
     if subcategories:
-
         context.user_data["current_parent_id"] = category_id
-
 
         keyboard = [
             [InlineKeyboardButton(
                 f"{cat['name']} {'✅' if cat['id'] in selected_categories else ''}",
-                callback_data=f"parent_{cat['id']}"
+                callback_data=f"category_{cat['id']}"
             )]
             for cat in subcategories
         ]
-        keyboard.append([InlineKeyboardButton("Повернутися", callback_data="back_to_parents")])
-        keyboard.append([InlineKeyboardButton("Завершити вибір", callback_data="finish_selection")])
-
+        keyboard.append([InlineKeyboardButton("🔙 Назад до категорій", callback_data="back_to_parents")])
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(
-            "Оберіть підкатегорії (✅ позначено обрані):",
+            "🔄 Ось підкатегорії для вашого вибору:",
             reply_markup=reply_markup,
         )
     else:
@@ -257,8 +259,8 @@ async def select_category(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         ]
 
         if current_parent_id:
-            keyboard.append([InlineKeyboardButton("Повернутися", callback_data="back_to_parents")])
-        keyboard.append([InlineKeyboardButton("Завершити вибір", callback_data="finish_selection")])
+            keyboard.append([InlineKeyboardButton("🔙 Назад до категорій", callback_data="back_to_parents")])
+        keyboard.append([InlineKeyboardButton("✅ Завершити вибір", callback_data="finish_selection")])
 
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(
@@ -313,7 +315,11 @@ START_KEYBOARD = ReplyKeyboardMarkup(
 
 async def confirm_edit(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Підтвердження редагування профілю."""
-    if update.message.text.lower() == "так":
+    if update.message.text == "❌ Ні":
+        await update.message.reply_text("🔄 Редагування скасовано. Ваш профіль не було змінено.")
+        return ConversationHandler.END
+
+    if update.message.text.lower() == "✅ так":
         access_token = context.user_data.get("access_token")
         location = context.user_data.get("edit_location")
         category_ids = context.user_data.get("selected_categories")
@@ -334,7 +340,7 @@ async def confirm_edit(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
             await edit_volunteer_location_and_categories(access_token, location, category_ids)
 
 
-            await update.message.reply_text("Профіль успішно оновлено.")
+            await update.message.reply_text("✅ Ваш профіль було успішно відредаговано.")
 
             main_menu_buttons = [
                 [KeyboardButton("Список завдань")],
@@ -349,11 +355,11 @@ async def confirm_edit(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
             await update.message.reply_text("Головне меню:", reply_markup=reply_markup)
 
         except ValueError as e:
-            await update.message.reply_text(f"Помилка: {str(e)}")
+            await update.message.reply_text(f"⚠️ Помилка: {str(e)}")
         except Exception as e:
-            await update.message.reply_text(f"Сталася помилка: Виберіть категорії в розділі 'Редагувати профіль', щоб отримувати заявки по вибраним категоріям ")
+            await update.message.reply_text(f"⚠️ Сталася помилка: Виберіть категорії в розділі 'Редагувати профіль', щоб отримувати заявки по вибраним категоріям ")
     else:
-        await update.message.reply_text("Редагування профілю скасовано.")
+        await update.message.reply_text("❌ Редагування профілю скасовано.")
 
         main_menu_buttons = [
             [KeyboardButton("Список завдань")],
@@ -382,7 +388,7 @@ async def cancel_edit(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
     ]
     reply_markup = ReplyKeyboardMarkup(main_menu_buttons, resize_keyboard=True, one_time_keyboard=False)
 
-    await update.message.reply_text("Редагування профілю скасовано.", reply_markup=reply_markup)
+    await update.message.reply_text("❌ Редагування профілю скасовано.", reply_markup=reply_markup)
     return ConversationHandler.END
 
 
@@ -399,9 +405,9 @@ edit_profile_handler = ConversationHandler(
             CallbackQueryHandler(select_category),
         ],
         CONFIRM_EDIT: [
-            MessageHandler(filters.Regex("^Так$"), confirm_edit),
-            MessageHandler(filters.Regex("^Ні$"), cancel_edit),
+            MessageHandler(filters.Regex("^✅ Так$"), confirm_edit),
+            MessageHandler(filters.Regex("^❌ Ні$"), cancel_edit),
         ],
     },
-    fallbacks=[MessageHandler(filters.Regex("^Скасувати редагування$"), cancel_edit)],
+    fallbacks=[MessageHandler(filters.Regex("^❌ Скасувати редагування$"), cancel_edit)],
 )

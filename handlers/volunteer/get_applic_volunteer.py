@@ -50,22 +50,21 @@ START_KEYBOARD = ReplyKeyboardMarkup(
 )
 
 
+from datetime import datetime
+
 async def choose_application_type(update, context):
     keyboard = [
-        [InlineKeyboardButton("Доступні", callback_data='available')],
-        [InlineKeyboardButton("Виконуються", callback_data='in_progress')],
-        [InlineKeyboardButton("Завершені", callback_data='finished')]
+        [InlineKeyboardButton("✅ Доступні", callback_data='available')],
+        [InlineKeyboardButton("⏳ Виконуються", callback_data='in_progress')],
+        [InlineKeyboardButton("✔️ Завершені", callback_data='finished')]
     ]
 
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text(
-        "Оберіть тип заявки:",
-        reply_markup=reply_markup
+        "🎯 **Оберіть тип заявки**:",
+        reply_markup=reply_markup,
+        parse_mode='Markdown'
     )
-
-
-from datetime import datetime
-
 
 async def button(update, context):
     query = update.callback_query
@@ -78,13 +77,22 @@ async def button(update, context):
     try:
         access_token = await ensure_valid_token(context)
     except Exception as e:
-        await query.answer(text=f"Помилка: {str(e)}")
+        await query.answer(text=f"❌ Помилка: {str(e)}")
         return
 
+    if application_type == "available":
+        response_text = "🟢 **Доступні заявки**: Це заявки, які ще не були виконані або завершені."
+    elif application_type == "in_progress":
+        response_text = "⏳ **Виконуються заявки**: Ці заявки знаходяться в процесі виконання."
+    elif application_type == "finished":
+        response_text = "✔️ **Завершені заявки**: Це заявки, які вже були виконані та завершені."
+    else:
+        response_text = "❓ Невідомий тип заявки"
+
     if application_type == "available" and not distance_filter:
-        keyboard = [[InlineKeyboardButton(f, callback_data=f"available|0|{f}") for f in DISTANCE_FILTERS]]
+        keyboard = [[InlineKeyboardButton(f"{f} км", callback_data=f"available|0|{f}") for f in DISTANCE_FILTERS]]
         reply_markup = InlineKeyboardMarkup(keyboard)
-        await query.edit_message_text("Оберіть фільтр за відстанню:", reply_markup=reply_markup)
+        await query.edit_message_text("🗺️ **Оберіть фільтр за відстанню**:", reply_markup=reply_markup, parse_mode='Markdown')
         return
 
     applications = await get_applications_by_type(
@@ -95,7 +103,7 @@ async def button(update, context):
         await query.answer(text=applications["detail"])
     else:
         if not applications:
-            await query.answer(text=f"Немає заявок зі статусом '{application_type}'.")
+            await query.answer(text=f"⚠️ Немає заявок зі статусом *'{application_type}'*.", parse_mode='Markdown')
         else:
             if distance_filter:
                 max_distance = int(distance_filter.split()[1])
@@ -108,7 +116,7 @@ async def button(update, context):
             end = start + ITEMS_PER_PAGE
             paginated_apps = applications[start:end]
 
-            response_text = f"Заявки зі статусом '{application_type}':\n\n"
+            response_text += "\n\n**Список заявок:**\n\n"
 
             def format_date(date_str):
                 if date_str:
@@ -135,15 +143,15 @@ async def button(update, context):
                 active_to_formatted = format_date(active_to)
 
                 if application_type in ["in_progress", "finished"]:
-                    creator_info = f"Автор: {first_name}, Телефон: {phone_num}"
+                    creator_info = f"📞 Автор: {first_name}, Телефон: {phone_num}"
                 else:
                     creator_info = ""
 
                 response_text += (
-                    f"Заявка {app['id']}:\n"
-                    f"Опис: {description}\n"
-                    f"Відстань: {distance_text}\n"
-                    f"Дійсна до: {active_to_formatted}\n"
+                    f"📝 Заявка {app['id']}:\n"
+                    f"📄 Опис: {description}\n"
+                    f"📍 Відстань: {distance_text}\n"
+                    f"📅 Дійсна до: {active_to_formatted}\n"
                     f"{creator_info}\n\n"
                 )
 
@@ -162,7 +170,5 @@ async def button(update, context):
 
             reply_markup = InlineKeyboardMarkup(keyboard)
 
-            await query.edit_message_text(response_text, reply_markup=reply_markup)
-
-
+            await query.edit_message_text(response_text, reply_markup=reply_markup, parse_mode='Markdown')
 

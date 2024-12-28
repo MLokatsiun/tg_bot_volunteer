@@ -66,46 +66,57 @@ async def ensure_valid_token(context: ContextTypes.DEFAULT_TYPE) -> str:
 
 
 async def start_deactivation(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Запит на деактивацію профілю волонтера."""
-    keyboard = [
-        [KeyboardButton("✅ Так, деактивувати мій профіль")],
-        [KeyboardButton("❌ Ні, скасувати деактивацію")],
-    ]
-    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
-    await update.message.reply_text(
-        "⚠️ Ви впевнені, що хочете деактивувати свій профіль бенефіціара? Це незворотна дія.",
-        reply_markup=reply_markup,
-    )
-    return ENTER_DEACTIVATION_CONFIRMATION_VOLUNTEER
+    """Запит на деактивацію профілю бенефіціара."""
+    try:
+        await ensure_valid_token(context)
+
+        keyboard = [
+            [KeyboardButton("Так, деактивувати мій профіль")],
+            [KeyboardButton("Ні, скасувати деактивацію")],
+        ]
+        reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
+        await update.message.reply_text(
+            "⚠️ Ви впевнені, що хочете деактивувати свій профіль бенефіціара?",
+            reply_markup=reply_markup,
+        )
+        return ENTER_DEACTIVATION_CONFIRMATION_VOLUNTEER
+    except Exception as e:
+        await update.message.reply_text(f"Помилка авторизації: {e}. Спробуйте увійти до системи.")
+        return ConversationHandler.END
 
 
 async def confirm_deactivation(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Підтвердження деактивації профілю волонтера."""
+    """Підтвердження деактивації профілю бенефіціара."""
     text = update.message.text.lower()
 
-    if text == "так, деактивувати мій профіль".lower():
-        access_token = await ensure_valid_token(context)
+    if "деактивувати" in text:
+        try:
+            access_token = await ensure_valid_token(context)
+            result = await deactivate_beneficiary_profile(access_token)
 
-        result = await deactivate_beneficiary_profile(access_token)
-        if result:
-            await update.message.reply_text("✅ Ваш профіль бенефіціара успішно деактивовано.")
+            if result:
 
+                context.user_data.clear()
+
+                await update.message.reply_text("✅ Ваш профіль бенефіціара успішно деактивовано.")
+                await update.message.reply_text(
+                    "🔑 Будь ласка, зареєструйтеся або авторизуйтеся для подальшої роботи:",
+                    reply_markup=AUTH_KEYBOARD,
+                )
+            else:
+                raise RuntimeError("Не вдалося виконати деактивацію профілю.")
+        except Exception as e:
             await update.message.reply_text(
-                "🔑 Будь ласка, зареєструйтеся або авторизуйтеся для подальшої роботи:",
-                reply_markup=AUTH_KEYBOARD,
+                f"Помилка: {e}. Повертаю вас до головного меню.", reply_markup=MAIN_KEYBOARD
             )
-        else:
-            await update.message.reply_text("⚠️ Сталася помилка при деактивації профілю.")
-
-            await update.message.reply_text("🔙 Повертаюсь до головного меню:", reply_markup=MAIN_KEYBOARD)
-    elif text == "ні, скасувати деактивацію".lower():
-        await update.message.reply_text("❌ Деактивація профілю волонтера скасована.")
-
+        return ConversationHandler.END
+    elif "скасувати" in text:
+        await update.message.reply_text("❌ Деактивація профілю бенефіціара скасована.")
         await update.message.reply_text("🔙 Повертаюсь до головного меню:", reply_markup=MAIN_KEYBOARD)
+        return ConversationHandler.END
     else:
         await update.message.reply_text("⚠️ Будь ласка, виберіть одну з наданих опцій.")
-
-    return ConversationHandler.END
+        return ENTER_DEACTIVATION_CONFIRMATION_VOLUNTEER
 
 
 deactivation_handler_ben = ConversationHandler(

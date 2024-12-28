@@ -642,7 +642,7 @@ async def refresh_moderator_token(refresh_token: str) -> dict:
 
 async def get_user_info(tg_id: str, role_id: int, client: str, password: str) -> Optional[Dict]:
     """Функція для перевірки, чи є користувач в базі через API."""
-    url = "https://bot.bckwdd.fun/auth/user/"  # Замість цього вкажіть правильний ендпоінт
+    url = "https://bot.bckwdd.fun/auth/user/"
     headers = {
         "Content-Type": "application/json",
     }
@@ -660,7 +660,7 @@ async def get_user_info(tg_id: str, role_id: int, client: str, password: str) ->
                     user_data = await response.json()
                     return user_data
                 elif response.status == 404:
-                    return None  # Користувача не знайдено
+                    return None
                 else:
                     error_message = await response.json()
                     print(f"Error: {error_message.get('detail', 'Unknown error')}")

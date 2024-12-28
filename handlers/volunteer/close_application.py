@@ -74,7 +74,7 @@ async def start_closing_application(update: Update, context: ContextTypes.DEFAUL
     """Початок процесу закриття заявки."""
 
     if not context.user_data.get("access_token"):
-        await update.message.reply_text("Ви не авторизовані. Спочатку виконайте вхід до системи.")
+        await update.message.reply_text("🚫 Ви не авторизовані. Спочатку виконайте вхід до системи.")
         return ConversationHandler.END
 
     try:
@@ -83,9 +83,8 @@ async def start_closing_application(update: Update, context: ContextTypes.DEFAUL
 
         applications = await get_applications_by_status(access_token, status="in_progress")
         if not applications:
-            await update.message.reply_text("Немає заявок, доступних для закриття.")
+            await update.message.reply_text("❌ Немає заявок, доступних для закриття.")
             return ConversationHandler.END
-
 
         context.user_data["applications_list"] = applications
         context.user_data["current_page"] = 0
@@ -95,7 +94,7 @@ async def start_closing_application(update: Update, context: ContextTypes.DEFAUL
         return CHOOSE_APPLICATION
 
     except Exception as e:
-        await update.message.reply_text(f"Сталася помилка: {str(e)}")
+        await update.message.reply_text(f"⚠️ Сталася помилка: {str(e)}")
         return ConversationHandler.END
 
 
@@ -106,7 +105,7 @@ def get_paginated_keyboard(applications, page, page_size):
     current_apps = applications[start:end]
 
     keyboard = [
-        [InlineKeyboardButton(f"ID: {app['id']} | {app['description']}", callback_data=str(app["id"]))]
+        [InlineKeyboardButton(f"🆔 ID: {app['id']} | 📝 {app['description']}", callback_data=f"app_{app['id']}")]
         for app in current_apps
     ]
 
@@ -162,7 +161,7 @@ async def choose_application(update: Update, context: ContextTypes.DEFAULT_TYPE)
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     await query.edit_message_text(
-        text=f"Ви вибрали заявку з ID: {application_id}. Завантажте файл для заявки (розмір до 5 МБ). Фото має бути надіслане як документ.",
+        text=f"Ви вибрали заявку з ID: {application_id}. Завантажте файл для заявки (розмір до 5 МБ). Фото має бути надіслане як документ. 📤",
         reply_markup=reply_markup
     )
     return UPLOAD_FILES
@@ -173,22 +172,21 @@ async def upload_files(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     document = update.message.document
 
     if not document:
-        await update.message.reply_text("Файл має бути надісланий як документ, а не як фото.")
+        await update.message.reply_text("❗ Файл має бути надісланий як документ, а не як фото.")
         return UPLOAD_FILES
 
     if document.file_size > MAX_FILE_SIZE:
-        await update.message.reply_text("Файл занадто великий. Спробуємо його стиснути...")
+        await update.message.reply_text("⚠️ Файл занадто великий. Спробуємо його стиснути...")
 
     file = await document.get_file()
     file_name = document.file_name
     file_data = await file.download_as_bytearray()
 
-
-    await update.message.reply_text("Зачекайте, файл завантажується та стискається...")
+    await update.message.reply_text("🕒 Зачекайте, файл завантажується та стискається...")
 
     compressed_file = compress_file(file_data)
     if len(compressed_file) > MAX_FILE_SIZE:
-        await update.message.reply_text("Файл навіть після стиснення перевищує дозволений розмір 5 МБ.")
+        await update.message.reply_text("🚫 Файл навіть після стиснення перевищує дозволений розмір 5 МБ.")
         return UPLOAD_FILES
 
     if not context.user_data.get("files"):
@@ -203,32 +201,32 @@ async def upload_files(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     await update.message.reply_text(
-        "Файл отримано та стиснуто. Якщо бажаєте, завантажте ще один або натисніть 'Завершити'.",
+        "📥 Файл отримано та стиснуто. Якщо бажаєте, завантажте ще один або натисніть 'Завершити'.",
         reply_markup=reply_markup
     )
     return UPLOAD_FILES
 
 
 async def handle_done(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Обробка дії 'Завершити'."""
+    """Обробка дії 'Завершити'. """
     query = update.callback_query
     await query.answer()
 
     await query.edit_message_reply_markup(reply_markup=None)
-    await query.edit_message_text("Зачекайте, обробка завершення заявки...")
+    await query.edit_message_text("🛠️ Зачекайте, обробка завершення заявки...")
 
     return await confirm_close_application(update, context)
 
 
 async def confirm_close_application(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Підтвердження закриття заявки."""
+    """Підтвердження закриття заявки. """
     application_id = context.user_data.get("application_id")
     files = context.user_data.get("files", [])
 
     message = update.message or update.callback_query.message
 
     if not application_id:
-        await message.reply_text("Виберіть заявку перед підтвердженням закриття.")
+        await message.reply_text("❗ Виберіть заявку перед підтвердженням закриття.")
         return ConversationHandler.END
 
     try:
@@ -242,21 +240,20 @@ async def confirm_close_application(update: Update, context: ContextTypes.DEFAUL
 
         if response and isinstance(response, dict) and 'application_id' in response:
             await message.reply_text(
-                f"Заявка {response['application_id']} успішно закрита. Додано файлів: {len(response['files'])}."
+                f"✅ Заявка {response['application_id']} успішно закрита. Додано файлів: {len(response['files'])}."
             )
         else:
             error_detail = response.get('detail', 'Невідома помилка') if response else 'Невідома помилка'
-            await message.reply_text(f"Сталася помилка: {error_detail}")
+            await message.reply_text(f"⚠️ Сталася помилка: {error_detail}")
 
     except Exception as e:
-        await message.reply_text(f"Сталася помилка: {str(e)}")
+        await message.reply_text(f"⚠️ Сталася помилка: {str(e)}")
 
     return ConversationHandler.END
 
 
-
 def compress_file(file_data: bytes) -> bytes:
-    """Стискання файлу перед відправкою."""
+    """Стискання файлу перед відправкою. """
     from io import BytesIO
     from PIL import Image
 
@@ -270,15 +267,15 @@ def compress_file(file_data: bytes) -> bytes:
 
 
 async def cancel_closing(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Скасування закриття заявки та повернення до головного меню."""
+    """Скасування закриття заявки та повернення до головного меню. """
     query = update.callback_query
     await query.answer()
 
     # Прибираємо кнопки
     await query.edit_message_reply_markup(reply_markup=None)
-    await query.edit_message_text("Закриття заявки скасовано.")
+    await query.edit_message_text("❌ Закриття заявки скасовано.")
 
-    await update.callback_query.message.reply_text("Вас повернуто до головного меню.", reply_markup=main_menu_markup)
+    await update.callback_query.message.reply_text("🔙 Вас повернуто до головного меню.", reply_markup=main_menu_markup)
     return ConversationHandler.END
 
 

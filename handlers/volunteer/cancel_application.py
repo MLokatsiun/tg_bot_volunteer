@@ -60,16 +60,15 @@ START_KEYBOARD = ReplyKeyboardMarkup(
 async def start_cancel_application(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Початок процесу скасування заявки."""
     try:
-        # Validate the access token
         access_token = await ensure_valid_token(context)
     except Exception as e:
-        await update.message.reply_text(f"Помилка: {str(e)}")
+        await update.message.reply_text(f"❌ Помилка: {str(e)}")
         return ConversationHandler.END
 
     try:
         applications = await get_applications_by_status(access_token, status="in_progress")
         if not applications:
-            await update.message.reply_text("Наразі немає заявок в процесі виконання.")
+            await update.message.reply_text("ℹ️ Наразі немає заявок в процесі виконання.")
             return ConversationHandler.END
 
         context.user_data["applications_list"] = applications
@@ -79,9 +78,9 @@ async def start_cancel_application(update: Update, context: ContextTypes.DEFAULT
         return CHOOSE_CANCEL_APPLICATION
 
     except PermissionError as e:
-        await update.message.reply_text(f"Помилка доступу: {str(e)}")
+        await update.message.reply_text(f"⛔ Помилка доступу: {str(e)}")
     except Exception as e:
-        await update.message.reply_text(f"Сталася помилка: {str(e)}")
+        await update.message.reply_text(f"❌ Сталася помилка: {str(e)}")
 
     return ConversationHandler.END
 
@@ -93,7 +92,7 @@ def get_paginated_keyboard(applications, page, page_size):
     current_apps = applications[start:end]
 
     keyboard = [
-        [InlineKeyboardButton(f"ID: {app['id']} | {app['description']}", callback_data=f"app_{app['id']}")]
+        [InlineKeyboardButton(f"🆔 ID: {app['id']} | 📝 {app['description']}", callback_data=f"app_{app['id']}")]
         for app in current_apps
     ]
 
@@ -116,10 +115,12 @@ async def display_application_page(update: Update, context: ContextTypes.DEFAULT
     reply_markup = get_paginated_keyboard(applications, page, PAGE_SIZE)
 
     if hasattr(update, "callback_query") and update.callback_query:
-        await update.callback_query.edit_message_text("Виберіть заявку зі списку для скасування:",
-                                                      reply_markup=reply_markup)
+        await update.callback_query.edit_message_text(
+            "📝 Виберіть заявку зі списку для скасування:",
+            reply_markup=reply_markup,
+        )
     else:
-        await update.message.reply_text("Виберіть заявку зі списку для скасування:", reply_markup=reply_markup)
+        await update.message.reply_text("📝 Виберіть заявку зі списку для скасування:", reply_markup=reply_markup)
 
 
 async def navigate_pages(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -142,7 +143,9 @@ async def choose_cancel_application(update: Update, context: ContextTypes.DEFAUL
     await query.answer()
 
     if not query.data.startswith("app_"):
-        await query.edit_message_text("Неправильний вибір. Будь ласка, скористайтеся кнопками для вибору заявки.")
+        await query.edit_message_text(
+            "⚠️ Неправильний вибір. Будь ласка, скористайтеся кнопками для вибору заявки."
+        )
         return CHOOSE_CANCEL_APPLICATION
 
     application_id = query.data.removeprefix("app_")
@@ -151,14 +154,14 @@ async def choose_cancel_application(update: Update, context: ContextTypes.DEFAUL
 
     keyboard = [
         [
-            InlineKeyboardButton("Підтвердити", callback_data="confirm_cancel"),
-            InlineKeyboardButton("Скасувати", callback_data="cancel_action"),
+            InlineKeyboardButton("✅ Підтвердити", callback_data="confirm_cancel"),
+            InlineKeyboardButton("❌ Скасувати", callback_data="cancel_action"),
         ]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     await query.edit_message_text(
-        text=f"Ви вибрали заявку з ID: {application_id}. Ви дійсно хочете скасувати виконання заявки?",
+        text=f"❓ Ви вибрали заявку з ID: {application_id}. Ви дійсно хочете скасувати виконання заявки?",
         reply_markup=reply_markup,
     )
     return CONFIRM_CANCEL_APPLICATION
@@ -173,22 +176,22 @@ async def confirm_cancel_application(update: Update, context: ContextTypes.DEFAU
     access_token = context.user_data.get("access_token")
 
     if not application_id:
-        await query.edit_message_text("Виберіть заявку перед підтвердженням скасування.")
+        await query.edit_message_text("⚠️ Виберіть заявку перед підтвердженням скасування.")
         return ConversationHandler.END
 
     try:
-
         access_token = await ensure_valid_token(context)
 
         response = await cancel_application(access_token, int(application_id))
         if response.get("status") == "Application cancelled successfully":
-            await query.edit_message_text(f"Заявка з ID: {application_id} успішно скасована.")
+            await query.edit_message_text(f"✅ Заявка з ID: {application_id} успішно скасована.")
         else:
             await query.edit_message_text(
-                f"Не вдалося скасувати заявку. Повідомлення: {response.get('detail', 'Невідома помилка')}")
+                f"❌ Не вдалося скасувати заявку. Повідомлення: {response.get('detail', 'Невідома помилка')}"
+            )
 
     except Exception as e:
-        await query.edit_message_text(f"Сталася помилка: {str(e)}")
+        await query.edit_message_text(f"❌ Сталася помилка: {str(e)}")
 
     return ConversationHandler.END
 
@@ -197,8 +200,9 @@ async def cancel_cancel_application(update: Update, context: ContextTypes.DEFAUL
     """Скасування процесу скасування заявки."""
     query = update.callback_query
     await query.answer()
-    await query.edit_message_text("Скасування заявки було скасовано.")
+    await query.edit_message_text("ℹ️ Скасування заявки було скасовано.")
     return ConversationHandler.END
+
 
 
 cancel_application_handler = ConversationHandler(

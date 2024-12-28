@@ -1,4 +1,5 @@
 import re
+from datetime import datetime
 
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup, KeyboardButton, \
     ReplyKeyboardRemove
@@ -6,11 +7,11 @@ from telegram.ext import ContextTypes, ConversationHandler, CommandHandler, Mess
     filters
 from urllib3 import request
 
-from handlers.beneficiary.create_application import reverse_geocode
-from services.api_client import register_user, login_user
+from handlers.beneficiary.create_application import reverse_geocode, ensure_valid_token
+from services.api_client import register_user, login_user, get_applications_by_status, accept_application
 
-AWAIT_CONFIRMATION, ENTER_PHONE, ENTER_FIRSTNAME, ENTER_LASTNAME, ENTER_PATRONYMIC, CHOOSE_DEVICE, ENTER_LOCATION, CONFIRM_DATA, CONFIRM_OR_EDIT = range(
-    9)
+AWAIT_CONFIRMATION, AWAIT_AUTHORIZATION, ENTER_PHONE, ENTER_FIRSTNAME, ENTER_LASTNAME, ENTER_PATRONYMIC, CHOOSE_DEVICE, ENTER_LOCATION, SELECT_APPLICATION, CONFIRM_APPLICATION, CONFIRM_DATA, CONFIRM_OR_EDIT = range(
+    12)
 
 from decouple import config
 
@@ -23,8 +24,15 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
     if deep_link_data:
         param = deep_link_data[0]
+
         if param == "volunteer":
             return await start_volunteer_registration(update, context)
+
+        elif param.startswith("app_"):
+            application_id = param.removeprefix("app_")
+            context.user_data["pending_application_id"] = application_id
+            return await start_application_flow(update, context, application_id)
+
         elif param == "beneficiary":
             return await start_beneficiary_registration(update, context)
 
@@ -33,10 +41,183 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         [KeyboardButton("Авторизація модератора")]
     ]
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-    await update.message.reply_text("🎉 Вітаємо!👋 Оберіть одну з опцій нижче, щоб продовжити.", reply_markup=reply_markup)
+    await update.message.reply_text(
+        "🎉 Вітаємо!👋 Оберіть одну з опцій нижче, щоб продовжити.",
+        reply_markup=reply_markup
+    )
 
     return ConversationHandler.END
 
+
+from datetime import datetime
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import CallbackQueryHandler
+
+async def process_application(update: Update, context: ContextTypes.DEFAULT_TYPE, application_id: str) -> int:
+    """
+    Логіка обробки заявки за її ID.
+    Перевіряє валідність токена доступу, отримує заявку через API,
+    і надсилає повідомлення з кнопками для підтвердження.
+    """
+    try:
+        access_token = await ensure_valid_token(context)
+
+        applications = await get_applications_by_status(access_token, status="available")
+
+        application_data = next((app for app in applications if str(app['id']) == application_id), None)
+
+        if not application_data:
+            await update.message.reply_text(
+                "❌ Заявка з таким ID не знайдена або не в доступному статусі для підтвердження.",
+                parse_mode="Markdown"
+            )
+            await main_menu(update, context)
+            return ConversationHandler.END
+
+        confirmation_text = (
+            f"✅ Ви вибрали заявку з ID: {application_data['id']}\n"
+            f"📝 Опис: {application_data['description']}\n"
+            f"📍 За {application_data['distance']} км. від вас\n\n"
+            f"❓ Ви впевнені, що виконаєте її?"
+        )
+
+        keyboard = [
+            [
+                InlineKeyboardButton("✅ Так", callback_data="confirm_yes"),
+                InlineKeyboardButton("❌ Ні", callback_data="confirm_no"),
+            ]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
+        confirmation_message = await update.message.reply_text(
+            confirmation_text,
+            parse_mode="Markdown",
+            disable_web_page_preview=True,
+            reply_markup=reply_markup
+        )
+
+        async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            query = update.callback_query
+            await query.answer()
+
+            if query.data == "confirm_yes":
+
+                try:
+                    application_data = await accept_application(access_token, int(application_id))
+
+                    local_application_data = next(
+                        (app for app in context.user_data.get("applications_list", []) if str(app["id"]) == application_id), {})
+
+                    creator_name = (
+                        application_data.get("creator", {}).get("first_name")
+                        or local_application_data.get("creator", {}).get("first_name", "Ім'я не вказано")
+                    )
+                    creator_phone = (
+                        application_data.get("creator", {}).get("phone_num")
+                        or local_application_data.get("creator", {}).get("phone_num", "Телефон не вказано")
+                    )
+
+                    location = application_data.get("location", {})
+                    latitude = location.get("latitude", "Не вказано")
+                    longitude = location.get("longitude", "Не вказано")
+                    address = location.get("address_name", "Адреса не вказана")
+
+                    google_maps_url = f"[🌍 тут](https://www.google.com/maps?q={latitude},{longitude})" if latitude != "Не вказано" and longitude != "Не вказано" else "Не вказано"
+
+                    location_text = (
+                        f"📍 Локація: {google_maps_url}\n"
+                        f"🏠 Адреса: {address}\n\n"
+                        if google_maps_url != "Не вказано"
+                        else "📍 Локація: не вказана\n🏠 Адреса: не вказана"
+                    )
+
+                    def format_date(date_str):
+                        if date_str:
+                            try:
+                                date_obj = datetime.fromisoformat(date_str)
+                                return date_obj.strftime("%d.%m.%Y %H:%M")
+                            except ValueError:
+                                return "❌ Невірний формат дати"
+                        return "Не вказано"
+
+                    date_at_formatted = format_date(application_data.get("date_at"))
+                    active_to_formatted = format_date(application_data.get("active_to"))
+
+                    confirmation_text = (
+                        f"✅ Заявка успішно прийнята!\n"
+                        f"🆔 ID: {application_data['id']}\n"
+                        f"📂 Категорія: {application_data['category_id']}\n"
+                        f"📝 Опис: {application_data['description']}\n"
+                        f"📅 Дата подачі: {date_at_formatted}\n"
+                        f"⏳ Активна до: {active_to_formatted}\n"
+                        f"🔄 Статус: Виконується\n\n"
+                        f"👤 Ім'я замовника: {creator_name}\n"
+                        f"📞 Телефон замовника: {creator_phone}\n\n"
+                        f"{location_text}"
+                    )
+
+                    await query.edit_message_text(
+                        confirmation_text,
+                        parse_mode="Markdown",
+                        disable_web_page_preview=True
+                    )
+
+                except Exception as e:
+                    await query.edit_message_text(
+                        text=f"❌ Сталася помилка при підтвердженні заявки: {str(e)}",
+                        parse_mode="Markdown"
+                    )
+                    await main_menu(update, context)
+
+            elif query.data == "confirm_no":
+                next_keyboard = [
+                    [KeyboardButton("Список завдань")],
+                    [KeyboardButton("Прийняти заявку в обробку")],
+                    [KeyboardButton("Закрити заявку")],
+                    [KeyboardButton("Скасувати заявку")],
+                    [KeyboardButton("Редагувати профіль")],
+                    [KeyboardButton("Деактивувати профіль волонтера")],
+                    [KeyboardButton("Вихід")]
+                ]
+                reply_markup = ReplyKeyboardMarkup(next_keyboard, resize_keyboard=True)
+
+                await query.edit_message_text(
+                    text="Заявка не підтверджена. Оберіть наступну дію:",
+                    parse_mode="Markdown"
+                )
+
+                effective_message = update.effective_message
+                if effective_message:
+                    await effective_message.reply_text(
+                        text="Головне меню:",
+                        reply_markup=reply_markup
+                    )
+
+            context.user_data.pop("pending_application_id", None)
+
+        context.application.add_handler(CallbackQueryHandler(button))
+
+    except Exception as e:
+        effective_message = update.effective_message
+        if effective_message:
+            await effective_message.reply_text(
+                f"❌ *Сталася помилка при обробці заявки:*\n\n{str(e)}",
+                parse_mode="Markdown"
+            )
+        await main_menu(update, context)
+
+    context.user_data.pop("pending_application_id", None)
+    return ConversationHandler.END
+
+
+
+async def cancel_application(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Handles the cancellation of the application acceptance process."""
+    query = update.callback_query
+    await query.answer()
+
+    await query.edit_message_text("Ви скасували прийняття заявки.")
+    return ConversationHandler.END
 
 async def start_volunteer_registration(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Перевірка, чи користувач уже зареєстрований, перед початком процесу реєстрації для волонтера."""
@@ -51,13 +232,11 @@ async def start_beneficiary_registration(update: Update, context: ContextTypes.D
 
 
 async def check_and_start_registration(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """
-    Перевіряє статус користувача через API.
-    Якщо користувач активний, перенаправляє до головного меню.
-    Якщо користувач не активний, показує отримані дані для підтвердження або редагування.
-    """
+
     tg_id = update.effective_user.id
     role_id = context.user_data.get("role_id")
+
+    application_id = context.user_data.get("pending_application_id")
 
     if update.message.text and "❌ Скасувати" in update.message.text:
         return await cancel(update, context)
@@ -70,6 +249,20 @@ async def check_and_start_registration(update: Update, context: ContextTypes.DEF
     }
 
     try:
+        access_token = context.user_data.get("access_token")
+        refresh_token = context.user_data.get("refresh_token")
+
+        if access_token and refresh_token:
+
+            if role_id == 2 and application_id:
+                return await process_application(update, context, application_id)
+
+            await update.message.reply_text(
+                "🎉 Ви вже зареєстровані! Переходимо до головного меню 🏠"
+            )
+            await main_menu(update, context)
+            return ConversationHandler.END
+
         response = await login_user(login_request)
 
         access_token = response.get("access_token")
@@ -79,31 +272,46 @@ async def check_and_start_registration(update: Update, context: ContextTypes.DEF
             context.user_data["access_token"] = access_token
             context.user_data["refresh_token"] = refresh_token
 
+            if role_id == 2 and application_id:
+                return await process_application(update, context, application_id)
+
             await update.message.reply_text(
                 "🎉 Ви вже зареєстровані! Переходимо до головного меню 🏠"
             )
             await main_menu(update, context)
             return ConversationHandler.END
 
-        elif response.get("is_active") is False:
+        if response.get("is_active") is False:
+
             context.user_data.update(response)
 
-            phone = response.get("phone_num", "Не вказано")
             firstname = response.get("firstname", "Не вказано")
             lastname = response.get("lastname", "")
             patronymic = response.get("patronymic", "")
+            phone = response.get("phone_num", "Не вказано")
             role = "Волонтер" if role_id == 2 else "Бенефіціар"
+            location_text = ""
 
-            location = response.get("location", {})
-            location_display = ""
+            if role_id == 2:
+                location_display = response.get("location", {})
+                latitude = location_display.get("latitude")
+                longitude = location_display.get("longitude")
+                address = location_display.get("address", "Адреса не вказана")
+                google_maps_url = (
 
-            if location:
-                if "latitude" in location and "longitude" in location:
-                    location_display = f"📍 Широта: {location['latitude']}, Довгота: {location['longitude']}"
-                elif "address" in location:
-                    location_display = f"🏠 Адреса: {location['address']}"
+                    f"[🌍 тут](https://www.google.com/maps?q={latitude},{longitude})"
 
-            confirmation_message = f"Дані, отримані з бази:\n\n"
+                    if latitude and longitude
+                    else "Не вказано"
+                )
+                location_text = (
+                    f"📍 Локація: {google_maps_url}\n🏠 Адреса: {address}\n\n"
+                    if latitude and longitude
+                    else "📍 Локація: не вказана\n🏠 Адреса: не вказана\n\n"
+
+                )
+
+            confirmation_message = "Дані, отримані з бази:\n\n"
 
             if firstname != "Не вказано":
                 confirmation_message += f"👤 Ім'я: {firstname}\n"
@@ -111,28 +319,37 @@ async def check_and_start_registration(update: Update, context: ContextTypes.DEF
                 confirmation_message += f"👤 Прізвище: {lastname}\n"
             if patronymic:
                 confirmation_message += f"👨‍👩‍👧‍👦 По-батькові: {patronymic}\n"
-            if role:
-                confirmation_message += f"🎭 Роль: {role}\n"
-            if location_display:
-                confirmation_message += f"{location_display}\n"
+            confirmation_message += f"🎭 Роль: {role}\n"
+
+            if role_id == 2:
+
+                confirmation_message += location_text
 
             confirmation_message += f"📞 Телефон: {phone}\n\n"
+
             confirmation_message += "Якщо дані вірні, натисніть '✅ Підтвердити'. Якщо потрібно внести зміни, натисніть '✏️ Редагувати'."
 
             keyboard = [
                 [KeyboardButton("✅ Підтвердити")],
                 [KeyboardButton("✏️ Редагувати")],
-                [KeyboardButton("❌ Скасувати")]
+                [KeyboardButton("❌ Скасувати")],
             ]
-            reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
 
-            await update.message.reply_text(confirmation_message, reply_markup=reply_markup)
+            reply_markup = ReplyKeyboardMarkup(
+
+                keyboard, resize_keyboard=True, one_time_keyboard=True
+            )
+            await update.message.reply_text(
+                confirmation_message,
+                parse_mode="Markdown",
+                disable_web_page_preview=True,
+                reply_markup=reply_markup,
+            )
             return CONFIRM_OR_EDIT
 
 
     except PermissionError:
         keyboard = [
-
             [KeyboardButton("🔍 Перевірити статус волонтера")],
             [KeyboardButton("❌ Скасувати")]
         ] if role_id == 2 else [
@@ -148,6 +365,70 @@ async def check_and_start_registration(update: Update, context: ContextTypes.DEF
 
     except Exception:
         return await start_registration(update, context)
+
+
+async def start_application_flow(update: Update, context: ContextTypes.DEFAULT_TYPE, application_id: str) -> int:
+    """
+    Початковий процес заявки:
+    1. Перевіряє, чи є токени.
+    2. Якщо токени є, одразу обробляє заявку.
+    3. Якщо токенів немає, пропонує авторизуватися через кнопку "Виконати заявку".
+    """
+    tg_id = update.effective_user.id
+    role_id = context.user_data.get("role_id")
+    access_token = context.user_data.get("access_token")
+
+    if access_token:
+        if role_id == 2:
+            context.user_data.pop("pending_application_id", None)
+            try:
+                result = await process_application(update, context, application_id)
+
+                return result
+
+            except Exception as e:
+                await update.message.reply_text(f"❌ Помилка при обробці заявки: {str(e)}")
+                await main_menu(update, context)
+                return ConversationHandler.END
+        else:
+            await update.message.reply_text("❌ Ця дія доступна лише для волонтерів.")
+            return ConversationHandler.END
+
+    context.user_data["pending_application_id"] = application_id
+    await update.message.reply_text(
+        "🔒 Ви не авторизовані. Щоб продовжити обробку заявки, натисніть кнопку 'Виконати заявку'."
+    )
+
+    keyboard = [
+        [KeyboardButton("🟢 Виконати заявку")],
+        [KeyboardButton("❌ Скасувати")]
+    ]
+    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
+    await update.message.reply_text("Виберіть дію:", reply_markup=reply_markup)
+
+    return AWAIT_AUTHORIZATION
+
+
+async def handle_execute_request(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """
+    Обробляє запит, коли користувач натискає "Виконати заявку".
+    Викликає функцію `check_and_start_registration` для авторизації/реєстрації.
+    """
+    if update.message.text == "🟢 Виконати заявку":
+        application_id = context.user_data.get("pending_application_id")
+        if application_id:
+            return await start_volunteer_registration(update, context)
+        else:
+            await update.message.reply_text("❌ Помилка: немає заявки для обробки.")
+            return await start_volunteer_registration(update, context)
+
+    elif update.message.text == "❌ Скасувати":
+        await update.message.reply_text("❌ Дію скасовано.")
+        return ConversationHandler.END
+
+    await update.message.reply_text("❌ Невідома дія. Спробуйте ще раз.")
+    return AWAIT_AUTHORIZATION
+
 
 
 async def handle_confirm_or_edit(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -404,7 +685,6 @@ async def confirm_registration(update: Update, context: ContextTypes.DEFAULT_TYP
     patronymic = user_data.get("patronymic", "Не вказано")
     role = "Волонтер" if user_data.get("role_id") == 2 else "Бенефіціар"
 
-    # Отримуємо локацію, але перевірка її наявності не потрібна для бенефіціарів
     location_display = "Не вказано"
     location = user_data.get("location", None)
 
@@ -413,7 +693,6 @@ async def confirm_registration(update: Update, context: ContextTypes.DEFAULT_TYP
     elif location and "address" in location:
         location_display = f"Адреса: {location['address']}"
 
-    # Формуємо повідомлення для підтвердження
     confirmation_message = (
         f"Ваші дані для підтвердження:\n\n"
         f"📱 Телефон: {phone}\n"
@@ -425,14 +704,12 @@ async def confirm_registration(update: Update, context: ContextTypes.DEFAULT_TYP
         "Якщо все вірно, натисніть '✅ Підтвердити'. Якщо потрібно виправити, натисніть '✏️ Редагувати'."
     )
 
-    # Кнопки для підтвердження
     keyboard = [
         [KeyboardButton("✅ Підтвердити")],
         [KeyboardButton("❌ Скасувати")]
     ]
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
 
-    # Відправляємо повідомлення
     await update.message.reply_text(confirmation_message, reply_markup=reply_markup)
     return CONFIRM_DATA
 
@@ -450,12 +727,12 @@ async def send_to_api(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
 
         if role_id == 2:
             keyboard = [
-                [KeyboardButton("Перевірити статус волонтера")],
+                [KeyboardButton("🔍 Перевірити статус волонтера")],
                 [KeyboardButton("❌ Скасувати")]
             ]
         else:
             keyboard = [
-                [KeyboardButton("Перевірити статус бенефіціара")],
+                [KeyboardButton("🔍 Перевірити статус бенефіціара")],
                 [KeyboardButton("❌ Скасувати")]
             ]
 
@@ -473,7 +750,7 @@ async def send_to_api(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
             [KeyboardButton("🔍 Перевірити статус волонтера")],
             [KeyboardButton("❌ Скасувати")]
         ] if user_data.get("role_id") == 2 else [
-            [KeyboardButton("🔍Перевірити статус бенефіціара")],
+            [KeyboardButton("🔍 Перевірити статус бенефіціара")],
             [KeyboardButton("❌ Скасувати")]
         ]
 
@@ -544,7 +821,7 @@ async def main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         ]
 
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=False)
-    await update.message.reply_text("Оберіть дію з меню нижче:", reply_markup=reply_markup)
+    await update.message.reply_text("Оберіть дію:", reply_markup=reply_markup)
 
 
 registration_handler = ConversationHandler(
@@ -555,8 +832,11 @@ registration_handler = ConversationHandler(
     ],
     states={
         AWAIT_CONFIRMATION: [
-            MessageHandler(filters.TEXT & ~filters.COMMAND, check_and_start_registration),
+            MessageHandler(filters.TEXT & ~filters.COMMAND, check_and_start_registration),        ],
+        AWAIT_AUTHORIZATION: [
+            MessageHandler(filters.TEXT & ~filters.COMMAND, handle_execute_request),
         ],
+
         ENTER_PHONE: [
             MessageHandler(filters.CONTACT | filters.TEXT & ~filters.COMMAND, enter_phone),
         ],
@@ -573,7 +853,9 @@ registration_handler = ConversationHandler(
             MessageHandler(filters.Regex("^✅ Підтвердити"), send_to_api),
             MessageHandler(filters.Regex("^❌ Скасувати$"), cancel),
         ],
-        CONFIRM_OR_EDIT: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_confirm_or_edit)],
+        CONFIRM_OR_EDIT: [
+            MessageHandler(filters.TEXT & ~filters.COMMAND, handle_confirm_or_edit),
+        ],
     },
     fallbacks=[
         CommandHandler("cancel", cancel),

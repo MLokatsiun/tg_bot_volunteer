@@ -49,7 +49,7 @@ async def reset_to_start_menu(context: ContextTypes.DEFAULT_TYPE):
 
     await context.bot.send_message(
         chat_id=context.user_data.get("chat_id"),
-        text="Термін дії вашого сеансу закінчився. Повертаємось до головного меню.",
+        text="⏳ Термін дії вашого сеансу закінчився. Повертаємось до головного меню.",
         reply_markup=START_KEYBOARD
     )
 START_KEYBOARD = ReplyKeyboardMarkup(
@@ -64,7 +64,7 @@ async def start_accept_application(update: Update, context: ContextTypes.DEFAULT
     """Start the application selection process with distance filter."""
 
     if not context.user_data.get("access_token"):
-        await update.message.reply_text("Ви не авторизовані. Спочатку виконайте вхід до системи.")
+        await update.message.reply_text("❌ Ви не авторизовані. Спочатку виконайте вхід до системи.")
         return ConversationHandler.END
 
 
@@ -93,16 +93,16 @@ async def start_accept_application(update: Update, context: ContextTypes.DEFAULT
         keyboard = [
             [InlineKeyboardButton(distance, callback_data=f"distance_{i}") for i, distance in enumerate(DISTANCE_FILTERS)]
         ]
-        keyboard.append([InlineKeyboardButton("Скасувати", callback_data="cancel")])
+        keyboard.append([InlineKeyboardButton("❌ Скасувати", callback_data="cancel")])
         reply_markup = InlineKeyboardMarkup(keyboard)
 
-        await update.message.reply_text("Оберіть дистанцію для пошуку заявок:", reply_markup=reply_markup)
+        await update.message.reply_text("📍 Оберіть дистанцію для пошуку заявок:", reply_markup=reply_markup)
         return CHOOSE_DISTANCE
 
     except PermissionError as e:
-        await update.message.reply_text(f"Помилка доступу: {str(e)}")
+        await update.message.reply_text(f"❌ Помилка доступу: {str(e)}")
     except Exception as e:
-        await update.message.reply_text(f"Сталася помилка: {str(e)}")
+        await update.message.reply_text(f"❌ Сталася помилка: {str(e)}")
 
     return ConversationHandler.END
 
@@ -113,7 +113,7 @@ async def choose_distance(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     await query.answer()
 
     if not query.data.startswith("distance_"):
-        await query.edit_message_text("Неправильний вибір. Будь ласка, спробуйте ще раз.")
+        await query.edit_message_text("⚠️ Неправильний вибір. Будь ласка, спробуйте ще раз.")
         return ConversationHandler.END
 
     selected_distance_index = int(query.data.removeprefix("distance_"))
@@ -129,7 +129,7 @@ async def choose_distance(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     ]
 
     if not filtered_applications:
-        await query.edit_message_text("Наразі немає доступних заявок у вибраній дистанції.")
+        await query.edit_message_text("📭 Наразі немає доступних заявок у вибраній дистанції.")
         return ConversationHandler.END
 
 
@@ -150,7 +150,7 @@ def get_paginated_keyboard(applications_list, page, page_size):
     current_apps = sorted_applications[start:end]
 
     keyboard = [
-        [InlineKeyboardButton(f"ID: {app['id']} | {app['description']}", callback_data=f"app_{app['id']}")]
+        [InlineKeyboardButton(f"🆔 ID: {app['id']} | 📝 {app['description']}", callback_data=f"app_{app['id']}")]
         for app in current_apps
     ]
 
@@ -163,7 +163,7 @@ def get_paginated_keyboard(applications_list, page, page_size):
     if nav_buttons:
         keyboard.append(nav_buttons)
 
-    keyboard.append([InlineKeyboardButton("Скасувати", callback_data="cancel")])
+    keyboard.append([InlineKeyboardButton("❌ Скасувати", callback_data="cancel")])
 
     return InlineKeyboardMarkup(keyboard)
 
@@ -175,9 +175,9 @@ async def display_application_page(update: Update, context: ContextTypes.DEFAULT
     reply_markup = get_paginated_keyboard(applications_list, page, PAGE_SIZE)
 
     if update.message:
-        await update.message.reply_text("Виберіть заявку зі списку (сортовано за ID):", reply_markup=reply_markup)
+        await update.message.reply_text("📋 Виберіть заявку зі списку (сортовано за ID):", reply_markup=reply_markup)
     elif update.callback_query:
-        await update.callback_query.edit_message_text("Виберіть заявку зі списку (сортовано за ID):", reply_markup=reply_markup)
+        await update.callback_query.edit_message_text("📋 Виберіть заявку зі списку (сортовано за ID):", reply_markup=reply_markup)
 
 async def choose_application(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Обробка вибору заявки користувачем."""
@@ -185,14 +185,14 @@ async def choose_application(update: Update, context: ContextTypes.DEFAULT_TYPE)
     await query.answer()
 
     if not query.data.startswith("app_"):
-        await query.edit_message_text("Неправильний вибір. Будь ласка, спробуйте ще раз.")
+        await query.edit_message_text("⚠️ Неправильний вибір. Будь ласка, спробуйте ще раз.")
         return CHOOSE_APPLICATION
 
     application_id = query.data.removeprefix("app_")
     application = next((app for app in context.user_data["applications_list"] if str(app["id"]) == application_id), None)
 
     if not application:
-        await query.edit_message_text("Помилка: Заявка не знайдена.")
+        await query.edit_message_text("❌ Помилка: Заявка не знайдена.")
         return ConversationHandler.END
 
 
@@ -201,17 +201,17 @@ async def choose_application(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     keyboard = [
         [
-            InlineKeyboardButton("Підтвердити", callback_data="confirm"),
-            InlineKeyboardButton("Скасувати", callback_data="cancel"),
+            InlineKeyboardButton("✅ Підтвердити", callback_data="confirm"),
+            InlineKeyboardButton("❌ Скасувати", callback_data="cancel"),
         ]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     await query.edit_message_text(
         text=(
-            f"Ви вибрали заявку з ID: {application_id}.\n\n"
-            f"Опис: {application['description']}\n"
-            f"Ви впевнені, що виконаєте її?"
+            f"✅ Ви вибрали заявку з ID: {application_id}.\n\n"
+            f"📝 Опис: {application['description']}\n"
+            f"❓ Ви впевнені, що виконаєте її?"
         ),
         reply_markup=reply_markup,
     )
@@ -230,11 +230,11 @@ async def confirm_application(update: Update, context: ContextTypes.DEFAULT_TYPE
     try:
         access_token = await ensure_valid_token(context)
     except Exception as e:
-        await query.edit_message_text(f"Сталася помилка при перевірці токена: {str(e)}")
+        await query.edit_message_text(f"❌ Сталася помилка при перевірці токена: {str(e)}")
         return ConversationHandler.END
 
     if not application_id:
-        await query.edit_message_text("Виберіть заявку перед підтвердженням.")
+        await query.edit_message_text("⚠️ Виберіть заявку перед підтвердженням.")
         return ConversationHandler.END
 
     try:
@@ -257,13 +257,13 @@ async def confirm_application(update: Update, context: ContextTypes.DEFAULT_TYPE
         longitude = location.get("longitude", "Не вказано")
         address = location.get("address_name", "Адреса не вказана")
 
-        google_maps_url = f"[тут](https://www.google.com/maps?q={latitude},{longitude})" if latitude != "Не вказано" and longitude != "Не вказано" else "Не вказано"
+        google_maps_url = f"[🌍 тут](https://www.google.com/maps?q={latitude},{longitude})" if latitude != "Не вказано" and longitude != "Не вказано" else "Не вказано"
 
         location_text = (
-            f"Локація: {google_maps_url}\n"
-            f"Адреса: {address}\n\n"
+            f"📍 Локація: {google_maps_url}\n"
+            f"🏠 Адреса: {address}\n\n"
             if google_maps_url != "Не вказано"
-            else "Локація: не вказана\nАдреса: не вказана"
+            else "📍 Локація: не вказана\n🏠 Адреса: не вказана"
         )
 
         def format_date(date_str):
@@ -272,28 +272,28 @@ async def confirm_application(update: Update, context: ContextTypes.DEFAULT_TYPE
                     date_obj = datetime.fromisoformat(date_str)
                     return date_obj.strftime("%d.%m.%Y %H:%M")
                 except ValueError:
-                    return "Невірний формат дати"
+                    return "❌ Невірний формат дати"
             return "Не вказано"
 
         date_at_formatted = format_date(application_data.get("date_at"))
         active_to_formatted = format_date(application_data.get("active_to"))
 
         confirmation_text = (
-            f"Заявка успішно прийнята!\n"
-            f"ID: {application_data['id']}\n"
-            f"Категорія: {application_data['category_id']}\n"
-            f"Опис: {application_data['description']}\n"
-            f"Дата подачі: {date_at_formatted}\n"
-            f"Активна до: {active_to_formatted}\n"
-            f"Статус: Виконується\n\n"
-            f"Ім'я замовника: {creator_name}\n"
-            f"Телефон замовника: {creator_phone}\n\n"
+            f"✅ Заявка успішно прийнята!\n"
+            f"🆔 ID: {application_data['id']}\n"
+            f"📂 Категорія: {application_data['category_id']}\n"
+            f"📝 Опис: {application_data['description']}\n"
+            f"📅 Дата подачі: {date_at_formatted}\n"
+            f"⏳ Активна до: {active_to_formatted}\n"
+            f"🔄 Статус: Виконується\n\n"
+            f"👤 Ім'я замовника: {creator_name}\n"
+            f"📞 Телефон замовника: {creator_phone}\n\n"
             f"{location_text}"
         )
 
         await query.edit_message_text(confirmation_text, parse_mode="Markdown", disable_web_page_preview=True)
     except Exception as e:
-        await query.edit_message_text(f"Сталася помилка: {str(e)}", parse_mode="Markdown")
+        await query.edit_message_text(f"❌ Сталася помилка: {str(e)}", parse_mode="Markdown")
 
     return ConversationHandler.END
 
@@ -323,7 +323,7 @@ async def cancel_accept_application(update: Update, context: ContextTypes.DEFAUL
     """Скасування прийняття заявки."""
     query = update.callback_query
     await query.answer()
-    await query.edit_message_text("Прийняття заявки скасовано.")
+    await query.edit_message_text("❌ Прийняття заявки скасовано.")
     return ConversationHandler.END
 
 
