@@ -739,7 +739,7 @@ async def send_to_api(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
         reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
 
         await update.message.reply_text(
-            "Реєстрація успішна! Ви можете перевірити статус або повернутися до меню.",
+            "✅ Реєстрація успішна! Ви можете перевірити статус або повернутися до меню.",
             reply_markup=reply_markup
         )
 
@@ -775,7 +775,7 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     if "❌ Скасувати" in update.message.text:
 
         await update.message.reply_text(
-            "Реєстрацію скасовано. Повертаємось до головного меню.",
+            "❌ Реєстрацію скасовано. Повертаємось до головного меню.",
             reply_markup=ReplyKeyboardRemove()
         )
 

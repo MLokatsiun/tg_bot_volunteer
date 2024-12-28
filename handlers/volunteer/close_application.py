@@ -270,8 +270,6 @@ async def cancel_closing(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     """Скасування закриття заявки та повернення до головного меню. """
     query = update.callback_query
     await query.answer()
-
-    # Прибираємо кнопки
     await query.edit_message_reply_markup(reply_markup=None)
     await query.edit_message_text("❌ Закриття заявки скасовано.")
 

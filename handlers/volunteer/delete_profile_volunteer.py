@@ -12,8 +12,8 @@ VOLUNTEER_MAIN_KEYBOARD = ReplyKeyboardMarkup(
         [KeyboardButton("Прийняти заявку в обробку")],
         [KeyboardButton("Закрити заявку")],
         [KeyboardButton("Скасувати заявку")],
-        [KeyboardButton("Редагувати профіль")],  # Кнопка для редагування профілю
-        [KeyboardButton("Деактивувати профіль волонтера")],  # Кнопка для деактивації профілю
+        [KeyboardButton("Редагувати профіль")],
+        [KeyboardButton("Деактивувати профіль волонтера")],
         [KeyboardButton("Вихід")]
     ],
     resize_keyboard=True, one_time_keyboard=False,
