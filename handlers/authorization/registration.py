@@ -439,8 +439,8 @@ async def handle_execute_request(update: Update, context: ContextTypes.DEFAULT_T
             return await start_volunteer_registration(update, context)
 
     elif update.message.text == "❌ Скасувати":
-        await update.message.reply_text("❌ Дію скасовано.")
-        return ConversationHandler.END
+        return await cancel(update, context)
+
 
     await update.message.reply_text("❌ Невідома дія. Спробуйте ще раз.")
     return AWAIT_AUTHORIZATION
