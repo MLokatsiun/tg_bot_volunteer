@@ -106,15 +106,15 @@ async def process_application(update: Update, context: ContextTypes.DEFAULT_TYPE
                     application_data = await accept_application(access_token, int(application_id))
 
                     local_application_data = next(
-                        (app for app in context.user_data.get("applications_list", []) if str(app["id"]) == application_id), {})
+                        (app for app in context.user_data["applications_list"] if str(app["id"]) == application_id), {})
 
                     creator_name = (
-                        application_data.get("creator", {}).get("first_name")
-                        or local_application_data.get("creator", {}).get("first_name", "Ім'я не вказано")
+                            application_data.get("creator", {}).get("first_name")
+                            or local_application_data.get("creator", {}).get("first_name", "Ім'я не вказано")
                     )
                     creator_phone = (
-                        application_data.get("creator", {}).get("phone_num")
-                        or local_application_data.get("creator", {}).get("phone_num", "Телефон не вказано")
+                            application_data.get("creator", {}).get("phone_num")
+                            or local_application_data.get("creator", {}).get("phone_num", "Телефон не вказано")
                     )
 
                     location = application_data.get("location", {})
@@ -156,16 +156,32 @@ async def process_application(update: Update, context: ContextTypes.DEFAULT_TYPE
                         f"{location_text}"
                     )
 
+                    next_keyboard = [
+                        [KeyboardButton("Список завдань")],
+                        [KeyboardButton("Прийняти заявку в обробку")],
+                        [KeyboardButton("Закрити заявку")],
+                        [KeyboardButton("Скасувати заявку")],
+                        [KeyboardButton("Редагувати профіль")],
+                        [KeyboardButton("Деактивувати профіль волонтера")],
+                        [KeyboardButton("Вихід")],
+                    ]
+                    reply_markup = ReplyKeyboardMarkup(next_keyboard, resize_keyboard=True)
+
                     await query.edit_message_text(
                         confirmation_text,
                         parse_mode="Markdown",
-                        disable_web_page_preview=True
+                        disable_web_page_preview=True,
+                    )
+
+                    await query.message.reply_text(
+                        "Оберіть наступну дію з меню:",
+                        reply_markup=reply_markup,
                     )
 
                 except Exception as e:
                     await query.edit_message_text(
                         text=f"❌ Сталася помилка при підтвердженні заявки: {str(e)}",
-                        parse_mode="Markdown"
+                        parse_mode="Markdown",
                     )
                     await main_menu(update, context)
 
