@@ -90,14 +90,14 @@ async def select_category(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         await query.edit_message_text("📋 Оберіть підкатегорію:", reply_markup=reply_markup)
         return ENTER_CATEGORY_ID
     else:
-        await query.edit_message_text(f"✅ Вибрано категорію ID {category_id}.\n📝 **Введіть опис вашої заявки:")
+        await query.edit_message_text(f"✅ Вибрано категорію ID {category_id}.\n📝 Введіть опис вашої заявки:")
         return ENTER_DESCRIPTION
 
 
 async def get_description(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Отримання опису заявки."""
     description = update.message.text.strip()
-    if description.lower() == "скасувати подачу заявки":
+    if description.lower() == "❌ скасувати подачу заявки":
         return await cancel_application(update, context)
 
     if not description:
@@ -111,8 +111,8 @@ async def get_description(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     context.user_data["description"] = description
 
     keyboard = [
-        [KeyboardButton("📱 Так, я на телефоні")],
-        [KeyboardButton("💻 Ні, я використовую ПК")],
+        [KeyboardButton("📱 Я на телефоні")],
+        [KeyboardButton("💻 Я використовую ПК")],
         [KeyboardButton("❌ Скасувати подачу заявки")],
     ]
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
@@ -131,12 +131,12 @@ async def get_location(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     """Обробка локації залежно від вибору пристрою або введення користувача."""
 
     if update.message.text:
-        user_response = update.message.text.strip()
+        user_response = update.message.text.strip().lower()
 
-        if user_response == "❌ Скасувати подачу заявки":
+        if user_response == "❌ cкасувати подачу заявки":
             return await cancel_application(update, context)
 
-        elif user_response == "📱 Так, я на телефоні":
+        elif user_response == "📱 я на телефоні":
 
             keyboard = [[KeyboardButton("📍 Поділитися локацією", request_location=True)],
                         [KeyboardButton("❌ Скасувати подачу заявки")]]
@@ -157,8 +157,8 @@ async def get_location(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
             )
             return ENTER_LOCATION
 
-        elif user_response == "💻 Ні, я використовую пк":
-            keyboard = [[KeyboardButton("❌ Скасувати подачу заявки")]]
+        elif user_response == "💻 я використовую пк":
+            keyboard = [[KeyboardButton("❌ скасувати подачу заявки")]]
             reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=False)
 
             await update.message.reply_text(
@@ -259,7 +259,7 @@ async def get_active_to(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     context.user_data["active_to"] = active_to
 
     confirmation_message = (
-        f"✅ **Перевірте введені дані:\n"
+        f"✅ Перевірте введені дані:\n"
         f"- 🆔 Категорія ID: {user_data.get('category_id')}\n"
         f"- 📋 Опис: {user_data.get('description')}\n"
         f"- {location_info}\n"
@@ -272,6 +272,7 @@ async def get_active_to(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     await update.message.reply_text(confirmation_message, reply_markup=reply_markup)
+
     cancel_keyboard = ReplyKeyboardMarkup(
         [[KeyboardButton("❌ Скасувати подачу заявки")]],
         resize_keyboard=True,
@@ -281,6 +282,7 @@ async def get_active_to(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
         "❗ Якщо потрібно скасувати заявку, натисніть кнопку нижче:",
         reply_markup=cancel_keyboard
     )
+
     return CONFIRM_DATA
 
 

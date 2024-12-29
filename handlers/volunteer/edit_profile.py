@@ -73,7 +73,7 @@ async def enter_location(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
         elif user_response == "💻 я використовую пк":
             keyboard = [[KeyboardButton("❌ Скасувати редагування")]]
-            reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
+            reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=False)
             await update.message.reply_text(
                 "💻 **Як знайти координати за допомогою Google Maps на ПК:**\n\n"
                 "1️⃣ Відкрийте [Google Maps](https://www.google.com/maps) у вашому браузері.\n"
